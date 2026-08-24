@@ -220,10 +220,94 @@ def basis_surve(basis_nyyd: float, basis_ajalugu: list[float]) -> Komponent:
 # Väravad — usaldusväärsuse kordaja, mitte suund
 # --------------------------------------------------------------------------
 
+def _rma(vaartused: list[float], n: int) -> list[float]:
+    """Wilderi silumine. Esimene vaartus on SMA, edasi rekursiivne."""
+    if len(vaartused) < n:
+        return []
+    out = [sum(vaartused[:n]) / n]
+    for x in vaartused[n:]:
+        out.append((out[-1] * (n - 1) + x) / n)
+    return out
+
+
+def adx(high: list[float], low: list[float], close: list[float],
+        di_pikkus: int = 14, silumine: int = 14) -> float:
+    """Wilderi ADX. Trendi TUGEVUS, mitte suund.
+
+    Vajab vahemalt di_pikkus + silumine + 1 kuunalt.
+    """
+    n = len(close)
+    if n < di_pikkus + silumine + 1:
+        raise ValueError(f"ADX vajab >= {di_pikkus + silumine + 1} kuunalt, sai {n}")
+    tr, plus_dm, minus_dm = [], [], []
+    for i in range(1, n):
+        ules = high[i] - high[i - 1]
+        alla = low[i - 1] - low[i]
+        plus_dm.append(ules if (ules > alla and ules > 0) else 0.0)
+        minus_dm.append(alla if (alla > ules and alla > 0) else 0.0)
+        tr.append(max(high[i] - low[i],
+                      abs(high[i] - close[i - 1]),
+                      abs(low[i] - close[i - 1])))
+    tr_s, p_s, m_s = _rma(tr, di_pikkus), _rma(plus_dm, di_pikkus), _rma(minus_dm, di_pikkus)
+    dx = []
+    for t, pp, mm in zip(tr_s, p_s, m_s):
+        if t == 0:
+            dx.append(0.0)
+            continue
+        di_p, di_m = 100 * pp / t, 100 * mm / t
+        summa = di_p + di_m
+        dx.append(100 * abs(di_p - di_m) / summa if summa else 0.0)
+    silutud = _rma(dx, silumine)
+    if not silutud:
+        raise ValueError("ADX-i ei saanud arvutada — liiga vahe andmeid")
+    return silutud[-1]
+
+
+def choppiness(high: list[float], low: list[float], close: list[float],
+               pikkus: int = 14) -> float:
+    """Choppiness Index. > 61.8 = kulgsuunaline, < 38.2 = trendiv.
+
+    Motleb sama asja kust teisest otsast kui ADX: kui palju teed kaib hind
+    ara vorreldes sellega, kui kaugele ta joudis. Kaks sold korraga on tugevam
+    kui kumbki eraldi, sest nad eksivad erinevatel juhtudel.
+    """
+    n = len(close)
+    if n < pikkus + 1:
+        raise ValueError(f"Choppiness vajab >= {pikkus + 1} kuunalt, sai {n}")
+    tr = [max(high[i] - low[i], abs(high[i] - close[i - 1]), abs(low[i] - close[i - 1]))
+          for i in range(n - pikkus, n)]
+    ulatus = max(high[-pikkus:]) - min(low[-pikkus:])
+    if ulatus <= 0 or sum(tr) <= 0:
+        return 100.0
+    return 100.0 * math.log10(sum(tr) / ulatus) / math.log10(pikkus)
+
+
+def treni_reziim(adx_vaartus: float, chop_vaartus: float, hind_ule_ema200: bool
+                 ) -> tuple[str, str, bool]:
+    """Kas turg trendib voi kaib kulgsuunas. Tagastab (nimi, selgitus, on_range).
+
+    Reegel parineb only_fibonacci Multicator Table'ist: ADX < 20 VOI Chop > 61.8
+    tahendab kulgsuunalist. Kaks tingimust VOI-ga, sest kumbki uksi jatab augu:
+    ADX jaab madalaks ka aeglases trendis, Chop laheb korgeks ka lai vahemik.
+    """
+    if adx_vaartus < 20 or chop_vaartus > 61.8:
+        return ("külgsuunaline",
+                f"ADX {adx_vaartus:.0f}, Chop {chop_vaartus:.0f} — servad hoiavad, "
+                "murrud kukuvad tagasi, voo lävi on tõstetud",
+                True)
+    suund = "üles" if hind_ule_ema200 else "alla"
+    return (f"trend {suund}",
+            f"ADX {adx_vaartus:.0f}, Chop {chop_vaartus:.0f} — voog kannab, "
+            "tagasitõmbed on ostu-/müügikohad, mitte pöörded",
+            False)
+
+
 def volatiliteedi_reziim(atr_pertsentiil: float) -> tuple[str, str]:
     """Plokk D. Ei anna suunda — annab ajastuse akna.
 
-    Kokkusurutud ATR ütleb, et liikumine TULEB, mitte kuhu.
+    Kokkusurutud ATR ütleb, et liikumine TULEB, mitte kuhu. See on trendi
+    režiimist SÕLTUMATU: külgsuunaline turg võib olla nii kokku surutud kui
+    laienenud, ja need kaks tähendavad täiesti eri asja.
     """
     if atr_pertsentiil <= 0.20:
         return "kokku surutud", "laienemine ees — suunda see ei ütle, ainult et liikumine tuleb"
@@ -280,11 +364,20 @@ class Lugemine:
     surve_kate: float
     varavad: Varavad
     reziim: tuple[str, str]
+    trend: tuple[str, str, bool]
     v_komponendid: list[Komponent] = field(default_factory=list)
     s_komponendid: list[Komponent] = field(default_factory=list)
     invalideerimine: str | None = None
 
-    LAVI = 25.0  # alla selle ei ole lugemist
+    LAVI_TREND = 25.0   # trendis piisab nõrgemast voost
+    LAVI_RANGE = 40.0   # külgsuunas peab voog olema selgelt tugevam
+
+    def lavi(self) -> float:
+        """Külgsuunalises turus on valemurd reegel, mitte erand — lävi tõuseb.
+
+        See on ainus koht, kus trendi režiim numbrit liigutab. Suunda ta ei anna.
+        """
+        return self.LAVI_RANGE if self.trend[2] else self.LAVI_TREND
 
     def usaldusvaarsus(self) -> float:
         return (self.varavad.varskus()
@@ -292,8 +385,10 @@ class Lugemine:
                 * (self.voo_kate + self.surve_kate) / 2)
 
     def kvadrant(self) -> tuple[str, str]:
-        if abs(self.voog) < self.LAVI:
-            return ("LUGEMIST EI OLE", f"voog {self.voog:+.0f} on alla {self.LAVI:.0f} läve — "
+        lavi = self.lavi()
+        if abs(self.voog) < lavi:
+            lisa = " (tõstetud, sest turg on külgsuunaline)" if self.trend[2] else ""
+            return ("LUGEMIST EI OLE", f"voog {self.voog:+.0f} on alla {lavi:.0f} läve{lisa} — "
                                        "ütle seda otse, ära tooda stsenaariume")
         return KVADRANDID[("+" if self.voog >= 0 else "-", "+" if self.surve >= 0 else "-")]
 
@@ -315,7 +410,9 @@ class Lugemine:
             f"  {seletus}",
             "",
             f"  Usaldusväärsus {u:.0%} · juhtiv muutuja: {self.varavad.juhtiv_muutuja()}",
+            f"  Režiim: {self.trend[0]} — {self.trend[1]}",
             f"  Volatiliteet: {self.reziim[0]} — {self.reziim[1]}",
+            f"  Voo lävi: {self.lavi():.0f}",
         ]
         for h in self.varavad.hoiatused():
             r.append(f"  ! {h}")
@@ -338,11 +435,14 @@ class Lugemine:
 
 def arvuta(coin: str, v_komponendid: list[Komponent], s_komponendid: list[Komponent],
            varavad: Varavad, atr_pertsentiil: float,
+           adx_vaartus: float = 25.0, chop_vaartus: float = 50.0,
+           hind_ule_ema200: bool = True,
            invalideerimine: str | None = None) -> Lugemine:
     voog, v_kate = _telg(v_komponendid)
     surve, s_kate = _telg(s_komponendid)
     return Lugemine(coin, voog, surve, v_kate, s_kate, varavad,
                     volatiliteedi_reziim(atr_pertsentiil),
+                    treni_reziim(adx_vaartus, chop_vaartus, hind_ule_ema200),
                     v_komponendid, s_komponendid, invalideerimine)
 
 
@@ -367,8 +467,17 @@ def _demo() -> None:
         long_short_kalle(ratio=2.35, borsi_oi_osakaal=0.53),
         basis_surve(0.118, basis_ajalugu),
     ]
+    # trendiv OHLC seeria — päris kasutuses tulevad need price_history'st
+    hi, lo, cl = [], [], []
+    hind = 100.0
+    for i in range(60):
+        hind *= 1.012 if i % 5 else 0.996
+        hi.append(hind * 1.008); lo.append(hind * 0.992); cl.append(hind)
+
     g = Varavad(andmete_vanus_h=1.2, kaetud_oi_osakaal=0.88, btc_korrelatsioon=0.61)
     lug = arvuta("HYPE", v, s, g, atr_pertsentiil=0.83,
+                 adx_vaartus=adx(hi, lo, cl), chop_vaartus=choppiness(hi, lo, cl),
+                 hind_ule_ema200=True,
                  invalideerimine="4h sulgemine alla 38.40 tühistab voo lugemise; "
                                  "funding alla mediaani tühistab surve lugemise")
     print(lug.render())
@@ -433,7 +542,53 @@ def _test() -> None:
     assert vana.varskus() < varske.varskus() == 1.0
     ok += 1
 
-    print(f"{ok}/8 testiplokki OK")
+    # --- trendi režiim ---
+    # puhas trend: iga küünal kõrgemal, kattuvust peaaegu pole
+    thi, tlo, tcl = [], [], []
+    x = 100.0
+    for _ in range(60):
+        x *= 1.02
+        thi.append(x*1.003); tlo.append(x*0.997); tcl.append(x)
+    # külgsuunaline: hind võngub sama vahemiku sees
+    rhi, rlo, rcl = [], [], []
+    for i in range(60):
+        y = 100 + (2.0 if i % 2 else -2.0)
+        rhi.append(y+1.5); rlo.append(y-1.5); rcl.append(y)
+
+    a_trend, a_range = adx(thi, tlo, tcl), adx(rhi, rlo, rcl)
+    c_trend, c_range = choppiness(thi, tlo, tcl), choppiness(rhi, rlo, rcl)
+    assert a_trend > 25, f"puhas trend peab andma ADX > 25, sai {a_trend:.1f}"
+    assert a_range < 20, f"võnkumine peab andma ADX < 20, sai {a_range:.1f}"
+    assert c_trend < 38.2, f"puhas trend peab andma Chop < 38.2, sai {c_trend:.1f}"
+    assert c_range > 61.8, f"võnkumine peab andma Chop > 61.8, sai {c_range:.1f}"
+    ok += 1
+
+    # VÕI-loogika: kumbki tingimus üksi viib külgsuunalisse
+    assert treni_reziim(15, 40, True)[2], "madal ADX üksi peab andma külgsuunalise"
+    assert treni_reziim(30, 70, True)[2], "kõrge Chop üksi peab andma külgsuunalise"
+    assert not treni_reziim(30, 40, True)[2], "tugev ADX + madal Chop on trend"
+    assert "üles" in treni_reziim(30, 40, True)[0]
+    assert "alla" in treni_reziim(30, 40, False)[0]
+    ok += 1
+
+    # sama voog: trendis on lugemine, külgsuunas mitte
+    v1 = [Komponent("a", 0.30, 100, "", "")]
+    s1 = [Komponent("b", 0.50, 100, "", "")]
+    trendis = arvuta("X", v1, s1, Varavad(), 0.5, 30, 40, True, invalideerimine="t")
+    kulgs  = arvuta("X", v1, s1, Varavad(), 0.5, 15, 70, True, invalideerimine="t")
+    assert trendis.lavi() == 25.0 and kulgs.lavi() == 40.0
+    assert trendis.kvadrant()[0] != "LUGEMIST EI OLE", "voog 30 trendis peab andma lugemise"
+    assert kulgs.kvadrant()[0] == "LUGEMIST EI OLE", "voog 30 külgsuunas jääb alla läve"
+    ok += 1
+
+    # režiim ja volatiliteet on eraldi teljed — sama režiim, eri volatiliteet
+    kokku = arvuta("X", v1, s1, Varavad(), 0.10, 15, 70, True, invalideerimine="t")
+    lai   = arvuta("X", v1, s1, Varavad(), 0.95, 15, 70, True, invalideerimine="t")
+    assert kokku.trend[0] == lai.trend[0] == "külgsuunaline"
+    assert kokku.reziim[0] == "kokku surutud" and lai.reziim[0] == "laienenud"
+    ok += 1
+
+    print(f"{ok}/12 testiplokki OK")
 
 
 if __name__ == "__main__":

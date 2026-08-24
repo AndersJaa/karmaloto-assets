@@ -62,7 +62,7 @@
   .row{display:grid; grid-template-columns:1fr 88px; gap:10px; align-items:center}
   .row label{font-size:.84rem; color:var(--ink-2)}
   .row .unit{font-family:"IBM Plex Mono",monospace; font-size:.72rem; color:var(--muted); display:block}
-  input[type=number],input[type=text],textarea{
+  input[type=number],input[type=text],textarea,select{
     font-family:"IBM Plex Mono",monospace; font-size:.82rem;
     background:var(--field); color:var(--ink);
     border:1px solid var(--field-rule); padding:6px 8px; width:100%;
@@ -70,7 +70,7 @@
   }
   textarea{grid-column:1/-1; resize:vertical; min-height:44px; line-height:1.4}
   .hist-label{grid-column:1/-1; font-size:.76rem; color:var(--muted); margin-top:2px}
-  input:focus-visible,textarea:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--pos); outline-offset:1px}
+  select:focus-visible,input:focus-visible,textarea:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--pos); outline-offset:1px}
 
   /* ---------- verdict ---------- */
   .verdict{background:var(--card); border:1px solid var(--rule); padding:22px 24px; margin-bottom:20px}
@@ -198,6 +198,14 @@
     </fieldset>
 
     <fieldset>
+      <legend>Režiim</legend>
+      <div class="row"><label for="adx">ADX <span class="unit">&lt; 20 = külgsuunaline</span></label><input type="number" id="adx" value="31" step="1"></div>
+      <div class="row"><label for="chop">Choppiness <span class="unit">&gt; 61.8 = külgsuunaline</span></label><input type="number" id="chop" value="42" step="0.1"></div>
+      <div class="row"><label for="ema">Hind vs EMA200</label>
+        <select id="ema"><option value="1">üleval</option><option value="0">all</option></select></div>
+    </fieldset>
+
+    <fieldset>
       <legend>Kohustuslik</legend>
       <div class="row" style="grid-template-columns:1fr"><label for="inval">Invalideerimine — täpne hind või tingimus, mis selle lugemise valeks tunnistab</label></div>
       <textarea id="inval" rows="2" placeholder="nt: 4h sulgemine alla 38.40 tühistab voo lugemise"></textarea>
@@ -221,7 +229,7 @@
     <div class="charts">
       <figure>
         <figcaption>Kvadrandikaart</figcaption>
-        <p class="figsub">Punkti asukoht kahel teljel. Hall vertikaalriba on |V| &lt; 25 — seal lugemist ei ole. Viirutus tähendab, et surve töötab voo vastu.</p>
+        <p class="figsub">Punkti asukoht kahel teljel. Hall vertikaalriba on voo lävi — külgsuunalises režiimis laieneb see 25-lt 40-le. Viirutus tähendab, et surve töötab voo vastu.</p>
         <svg id="quad" viewBox="0 0 360 384" role="img" aria-labelledby="quadtitle">
           <title id="quadtitle">Voo ja surve kvadrandikaart</title>
           <defs>
@@ -368,7 +376,16 @@
     "-+":["LONGIDE VÄLJASURUMINE","voog on alla ja rahvahulk on longis — kõige valusam kombinatsioon longidele"],
     "--":["SHORTIDE KÜTUS","voog on alla, aga shordid on ülerahvastatud — iga tõuge üles leiab kütust"],
   };
-  const LAVI = 25;
+  const LAVI_TREND = 25, LAVI_RANGE = 40;
+
+  // only_fibonacci Multicator Table'i reegel: kumbki tingimus üksi viib külgsuunalisse,
+  // sest ADX jääb madalaks ka aeglases trendis ja Chop läheb kõrgeks ka laias vahemikus
+  function trendReziim(adxV, chopV, ules){
+    if(adxV < 20 || chopV > 61.8)
+      return ["külgsuunaline", `ADX ${adxV.toFixed(0)}, Chop ${chopV.toFixed(0)} — servad hoiavad, murrud kukuvad tagasi`, true];
+    return [`trend ${ules ? "üles" : "alla"}`,
+            `ADX ${adxV.toFixed(0)}, Chop ${chopV.toFixed(0)} — voog kannab, tagasitõmbed pole pöörded`, false];
+  }
 
   function regime(p){
     if(p <= 0.20) return ["kokku surutud","laienemine ees — suunda see ei ütle, ainult et liikumine tuleb"];
@@ -394,7 +411,7 @@
   const px = v => MID + v*SCALE;
   const py = v => MID - v*SCALE;
 
-  function drawQuad(V, S){
+  function drawQuad(V, S, LAVI){
     const bg = $('quadbg'), ax = $('quadaxes'), pt = $('quadpt');
     const lo = LO, hi = HI;
     // fill tracks flow direction; hatch marks the quadrants where surve works against voog
@@ -479,7 +496,9 @@
     const {V, S} = comps();
     const av = axis(V), as = axis(S);
 
-    drawQuad(av.val, as.val);
+    const trend = trendReziim(num('adx'), num('chop'), $('ema').value === "1");
+    const LAVI = trend[2] ? LAVI_RANGE : LAVI_TREND;
+    drawQuad(av.val, as.val, LAVI);
     drawBars($('vbars'), V, av.wOn);
     drawBars($('sbars'), S, as.wOn);
     drawTable(V, S, av.wOn, as.wOn);
@@ -487,7 +506,7 @@
     const inval = $('inval').value.trim();
     const locked = inval.length === 0;
     const dead = Math.abs(av.val) < LAVI;
-    const q = dead ? ["LUGEMIST EI OLE", `voog ${av.val.toFixed(0)} on alla ${LAVI} läve — ütle seda otse, ära tooda stsenaariume`]
+    const q = dead ? ["LUGEMIST EI OLE", `voog ${av.val.toFixed(0)} on alla ${LAVI} läve${trend[2] ? " (tõstetud, sest turg on külgsuunaline)" : ""} — ütle seda otse, ära tooda stsenaariume`]
                    : QUAD[(av.val>=0?"+":"-")+(as.val>=0?"+":"-")];
 
     $('vval').textContent = (av.val>=0?"+":"") + av.val.toFixed(0);
@@ -507,7 +526,9 @@
     const chips = [
       `<span class="chip">usaldusväärsus <b>${Math.round(conf*100)}%</b></span>`,
       `<span class="chip">juhtiv muutuja <b>${Math.abs(btc)>=0.8 ? "BTC" : "coin ise"}</b></span>`,
+      `<span class="chip">režiim <b>${trend[0]}</b></span>`,
       `<span class="chip">volatiliteet <b>${reg[0]}</b></span>`,
+      `<span class="chip">voo lävi <b>${LAVI}</b></span>`,
     ];
     if(age > 3) chips.push(`<span class="chip alert">andmed <b>${age.toFixed(1)}h vanad</b></span>`);
     if(cov < 0.6) chips.push(`<span class="chip alert">kate <b>${Math.round(cov*100)}% OI-st</b></span>`);

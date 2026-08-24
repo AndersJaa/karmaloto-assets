@@ -5,7 +5,7 @@ Liitindikaator, mis koondab **ainult mehaaniliselt mõõdetavad** näitajad
 
 ```
 python3 vsi.py --demo     # näidislugemine väljamõeldud arvudega
-python3 vsi.py --test     # 8 testiplokki
+python3 vsi.py --test     # 12 testiplokki
 ```
 
 ## Miks Elliott siin ei ole
@@ -92,5 +92,31 @@ usaldusväärsus = värskus × kaetud_OI_osakaal × keskmine_komponentide_kate
 Eraldi lipp: kui |korrelatsioon BTC-ga| ≥ 0.80, kirjutatakse välja, et **juhtiv muutuja
 on BTC**, mitte coin ise. See ei nulli lugemist — see ütleb, mille peale coin liigub.
 
-Volatiliteedi režiim (ATR pertsentiil) on samuti eraldi, mitte telje sees: kokkusurutud
-ATR ütleb, et liikumine **tuleb**, mitte kuhu. Suunda temast ei tehta.
+## Režiim — ainus koht, kus kontekst numbrit liigutab
+
+Kaks üksteisest sõltumatut režiimi, kumbki eraldi teljest:
+
+**Trend vs külgsuunaline** — reegel on üle võetud only_fibonacci `Multicator Table`'ist:
+
+```
+ADX < 20  VÕI  Chop > 61.8   →   külgsuunaline
+```
+
+VÕI, mitte JA, sest kumbki tingimus üksi jätab augu: ADX jääb madalaks ka aeglases
+trendis, Choppiness läheb kõrgeks ka laias trendivas vahemikus. Kaks sõltumatut mõõtu
+sama asja kohta eksivad erinevatel juhtudel. `adx()` ja `choppiness()` on moodulis
+olemas, nii et neid ei pea graafikult maha lugema.
+
+See režiim **tõstab voo läve**, ei anna suunda:
+
+| Režiim | Voo lävi |
+|---|---|
+| trend üles / trend alla | 25 |
+| külgsuunaline | 40 |
+
+Põhjus on koondtabeli Dow' rida: külgsuunalises turus on valemurd reegel, mitte erand.
+Sama V = +27 annab trendis lugemise ja külgsuunas mitte. Test kontrollib täpselt seda.
+
+**Volatiliteet (ATR pertsentiil)** on sellest sõltumatu: kokkusurutud ATR ütleb, et
+liikumine **tuleb**, mitte kuhu. Külgsuunaline turg võib olla nii kokku surutud kui
+laienenud, ja need kaks tähendavad täiesti eri asja — sellepärast neid ei liideta.
