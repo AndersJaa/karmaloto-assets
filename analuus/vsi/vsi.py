@@ -393,6 +393,7 @@ class Lugemine:
 
     LAVI_TREND = 25.0   # trendis piisab nõrgemast voost
     LAVI_RANGE = 40.0   # külgsuunas peab voog olema selgelt tugevam
+    MIN_KATE = 0.50     # alla poole telje kaalust ei ole telg, vaid üks komponent
 
     def lavi(self) -> float:
         """Külgsuunalises turus on valemurd reegel, mitte erand — lävi tõuseb.
@@ -407,6 +408,21 @@ class Lugemine:
                 * (self.voo_kate + self.surve_kate) / 2)
 
     def kvadrant(self) -> tuple[str, str]:
+        # Kaetuse põrand. Kaal jaotub puuduvate komponentide pealt ümber, mis on
+        # õige — aga kui alles on vähem kui pool, siis ei mõõda telg enam seda,
+        # mida ta lubab: üks ellujäänud komponent saab terve telje endale ja
+        # annab uhke +100. Madal usaldusväärsuse protsent on kõrvalmärkus, mida
+        # keegi verdikti kõrval ei loe. Nii et sellisel juhul lugemist ei tule.
+        puudulik = []
+        if self.voo_kate < self.MIN_KATE:
+            puudulik.append(f"V-teljel on kaetud {self.voo_kate:.0%} kaalust")
+        if self.surve_kate < self.MIN_KATE:
+            puudulik.append(f"S-teljel on kaetud {self.surve_kate:.0%} kaalust")
+        if puudulik:
+            return ("LUGEMIST EI OLE",
+                    " ja ".join(puudulik) + f" (vaja vähemalt {self.MIN_KATE:.0%}) — "
+                    "puuduvad komponendid tuleb tõmmata, mitte ümber kaaluda")
+
         lavi = self.lavi()
         if abs(self.voog) < lavi:
             lisa = " (tõstetud, sest turg on külgsuunaline)" if self.trend[2] else ""
@@ -573,6 +589,29 @@ def _test() -> None:
         pass
     ok += 1
 
+    # kaetuse põrand: pool telge puudu = lugemist ei ole, ükskõik kui kõrge number
+    poolik = arvuta("X",
+                    [Komponent("on", 1.0, 35, "", ""),
+                     Komponent("maas1", 0.0, 30, "", "", kehtiv=False),
+                     Komponent("maas2", 0.0, 20, "", "", kehtiv=False),
+                     Komponent("maas3", 0.0, 15, "", "", kehtiv=False)],
+                    [Komponent("s", 0.8, 100, "", "")],
+                    Varavad(), 0.5, invalideerimine="t")
+    assert poolik.voog == 100.0, "üks komponent haarab telje — see osa ongi probleem"
+    assert poolik.kvadrant()[0] == "LUGEMIST EI OLE", \
+        "35% kaetusega ei tohi verdikti tulla, ükskõik kui kõrge V on"
+    assert "V-teljel" in poolik.kvadrant()[1], "peab ütlema, KUMB telg on puudulik"
+
+    # 65% kaetust on üle põranda ja lugemine tuleb
+    piisav = arvuta("X",
+                    [Komponent("a", 1.0, 35, "", ""), Komponent("b", 1.0, 30, "", ""),
+                     Komponent("c", 0.0, 20, "", "", kehtiv=False),
+                     Komponent("d", 0.0, 15, "", "", kehtiv=False)],
+                    [Komponent("s", 0.8, 100, "", "")],
+                    Varavad(), 0.5, invalideerimine="t")
+    assert piisav.kvadrant()[0] != "LUGEMIST EI OLE", "65% kaetust peab lugemise andma"
+    ok += 1
+
     # BTC enda peal ei ole korrelatsioon iseendaga näitaja
     v_btc = [Komponent("a", 0.9, 100, "", "")]
     s_btc = [Komponent("b", 0.5, 100, "", "")]
@@ -640,7 +679,7 @@ def _test() -> None:
     assert kokku.reziim[0] == "kokku surutud" and lai.reziim[0] == "laienenud"
     ok += 1
 
-    print(f"{ok}/15 testiplokki OK")
+    print(f"{ok}/16 testiplokki OK")
 
 
 if __name__ == "__main__":

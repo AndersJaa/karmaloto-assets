@@ -93,6 +93,33 @@ telefonis olev järjehoidja jääb vana peale.
 Anna tekstilugemine ja link. Ütle **üks selge seisukoht**, mitte stsenaariumide
 nimekiri. Kui ei tea, ütle see otse.
 
+## Kui CoinGlassi ühendust ei ole
+
+See juhtub — mõnes aknas või ajastatud ülesandes pole CoinGlassi ühendust kaasas.
+**Siis VSI lugemist ei tule.** Ütle see otse ja ütle ka, mis puudu on.
+
+Anders'i `market_snapshot.json` (Macis, peegeldub Google Drive'i kausta `TradeData`)
+**ei asenda seda**. Ta annab positsiooni mündi kohta `markPx`, `funding`, `oi_trend`,
+`whales` ja `crowding` — see katab VSI seitsmest komponendist heal juhul kaks, ja
+kolme lõksuga:
+
+- `openInterest_units` on **COIN-ÜHIKUTES, mitte USD-s**. Likvideerimiste müravärav
+  ja OI-hinna komponent eeldavad USD-d. Ühikute segamini ajamine annab vaikselt
+  jama, mis näeb välja nagu arv.
+- `funding` on **TUNNINE**, mitte 8-tunnine, ja ainult Hyperliquidist — mitte
+  `oi_weighted` mitme börsi peale.
+- Üks snapshot on **üks ajapunkt**. Funding ja basis vajavad z-skoori jaoks ≥ 8
+  vaatlust. Ühest failist neid ei tule.
+
+Mida snapshot **hästi** annab: õige mark price tema enda venue'ilt (mitte asendus-
+börsilt), OI trendi suuna ja valaskannu. Kasuta seda hinna ja konteksti jaoks —
+ja ütle välja, et see on kontekst, mitte lugemine.
+
+Kaetuse põrand on koodis: kui telje kaalust on kaetud alla poole, keeldub
+`kvadrant()` verdiktist ja ütleb, kumb telg on puudulik. Ühest ellujäänud
+komponendist saaks muidu uhke V = 100, mille kõrval madal usaldusväärsuse
+protsent on kõrvalmärkus, mida keegi ei loe.
+
 ## Reeglid, mis ei ole soovitused
 
 **Invalideerimine on kohustuslik.** Skript keeldub ilma selleta töötamast, sest

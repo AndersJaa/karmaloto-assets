@@ -387,7 +387,7 @@
     "-+":["LONGIDE VÄLJASURUMINE","voog on alla ja rahvahulk on longis — kõige valusam kombinatsioon longidele"],
     "--":["SHORTIDE KÜTUS","voog on alla, aga shordid on ülerahvastatud — iga tõuge üles leiab kütust"],
   };
-  const LAVI_TREND = 25, LAVI_RANGE = 40;
+  const LAVI_TREND = 25, LAVI_RANGE = 40, MIN_KATE = 0.50;
 
   // only_fibonacci Multicator Table'i reegel: kumbki tingimus üksi viib külgsuunalisse,
   // sest ADX jääb madalaks ka aeglases trendis ja Chop läheb kõrgeks ka laias vahemikus
@@ -517,8 +517,16 @@
     const inval = $('inval').value.trim();
     const locked = inval.length === 0;
     const dead = Math.abs(av.val) < LAVI;
-    const q = dead ? ["LUGEMIST EI OLE", `voog ${av.val.toFixed(0)} on alla ${LAVI} läve${trend[2] ? " (tõstetud, sest turg on külgsuunaline)" : ""} — ütle seda otse, ära tooda stsenaariume`]
-                   : QUAD[(av.val>=0?"+":"-")+(as.val>=0?"+":"-")];
+    // kaetuse põrand: alla poole telje kaalust ei mõõda telg enam seda, mida lubab —
+    // üks ellujäänud komponent saaks terve telje endale ja annaks uhke +100
+    const puudulik = [];
+    if(av.cover < MIN_KATE) puudulik.push(`V-teljel on kaetud ${Math.round(av.cover*100)}% kaalust`);
+    if(as.cover < MIN_KATE) puudulik.push(`S-teljel on kaetud ${Math.round(as.cover*100)}% kaalust`);
+
+    const q = puudulik.length
+      ? ["LUGEMIST EI OLE", puudulik.join(" ja ") + ` (vaja vähemalt ${MIN_KATE*100}%) — puuduvad komponendid tuleb tõmmata, mitte ümber kaaluda`]
+      : dead ? ["LUGEMIST EI OLE", `voog ${av.val.toFixed(0)} on alla ${LAVI} läve${trend[2] ? " (tõstetud, sest turg on külgsuunaline)" : ""} — ütle seda otse, ära tooda stsenaariume`]
+             : QUAD[(av.val>=0?"+":"-")+(as.val>=0?"+":"-")];
 
     $('vval').textContent = (av.val>=0?"+":"") + av.val.toFixed(0);
     $('sval').textContent = (as.val>=0?"+":"") + as.val.toFixed(0);
