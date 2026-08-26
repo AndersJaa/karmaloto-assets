@@ -26,11 +26,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 import vsi  # noqa: E402
 
 
+# Basis ja spot/ETF voog EI ole siin. Kummalgi on mündid, kus neid lihtsalt ei
+# eksisteeri — HYPE-l pole kvartalifutuuri, ETF-vood on ainult BTC-l ja ETH-il.
+# Nende nõudmine tähendaks, et selliste müntide kohta ei tule lugemist kunagi.
+# Nende puudumine on juba kaetud: kaal jaotub ümber ja kaetuse põrand otsustab,
+# kas telge saab veel lugeda.
 KOHUSTUSLIK = [
     "coin", "hinna_muutus_pct", "oi_muutus_pct", "neto_taker_usd", "maht_usd",
     "long_liq_usd", "short_liq_usd", "oi_usd",
     "funding_nyyd_pct", "funding_ajalugu_pct",
-    "basis_nyyd_pct", "basis_ajalugu_pct",
     "long_short_ratio", "borsi_oi_osakaal",
     "andmete_vanus_h", "kaetud_oi_osakaal", "btc_korrelatsioon",
     "atr_pertsentiil", "adx", "chop", "hind_ule_ema200",
@@ -55,10 +59,15 @@ def kontrolli(d: dict) -> None:
             "Invalideerimine on tühi. Ilma täpse hinna või tingimuseta, mis lugemise "
             "valeks tunnistab, lugemist ei anta."
         )
-    if len(d["funding_ajalugu_pct"]) < 8 or len(d["basis_ajalugu_pct"]) < 8:
+    if len(d["funding_ajalugu_pct"]) < 8:
         raise SystemExit(
-            "Funding ja basis vajavad vähemalt 8 ajaloopunkti, et mediaan/MAD oleks "
+            "Funding vajab vähemalt 8 ajaloopunkti, et mediaan/MAD oleks "
             "tähenduslik. Tõmba pikem aken."
+        )
+    if "basis_nyyd_pct" in d and len(d.get("basis_ajalugu_pct", [])) < 8:
+        raise SystemExit(
+            "Basis on antud, aga ajalugu on lühem kui 8 punkti. Kas tõmba pikem "
+            "aken või jäta basis üldse välja — poolik ajalugu annab vale z-skoori."
         )
 
 
@@ -76,9 +85,12 @@ def ehita(d: dict) -> vsi.Lugemine:
         vsi.funding_surve(d["funding_nyyd_pct"] / 100,
                           [x / 100 for x in d["funding_ajalugu_pct"]]),
         vsi.long_short_kalle(d["long_short_ratio"], d["borsi_oi_osakaal"]),
-        vsi.basis_surve(d["basis_nyyd_pct"] / 100,
-                        [x / 100 for x in d["basis_ajalugu_pct"]]),
     ]
+    # basis puudub mündil, millel kvartalifutuuri ei ole — kaal jaotub ümber ja
+    # kaetuse põrand ütleb, kas S-telge saab veel lugeda
+    if "basis_nyyd_pct" in d and d.get("basis_ajalugu_pct"):
+        s.append(vsi.basis_surve(d["basis_nyyd_pct"] / 100,
+                                 [x / 100 for x in d["basis_ajalugu_pct"]]))
     varavad = vsi.Varavad(
         andmete_vanus_h=d["andmete_vanus_h"],
         kaetud_oi_osakaal=d["kaetud_oi_osakaal"],
@@ -105,8 +117,8 @@ def preset(d: dict) -> dict:
             "flow": round(d["spot_voog_usd"] / 1e6, 2) if "spot_voog_usd" in d else "",
             "fnow": d["funding_nyyd_pct"],
             "fhist": " ".join(str(x) for x in d["funding_ajalugu_pct"]),
-            "bnow": d["basis_nyyd_pct"],
-            "bhist": " ".join(str(x) for x in d["basis_ajalugu_pct"]),
+            "bnow": d.get("basis_nyyd_pct", ""),
+            "bhist": " ".join(str(x) for x in d.get("basis_ajalugu_pct", [])),
             "ls": d["long_short_ratio"],
             "share": round(d["borsi_oi_osakaal"] * 100, 1),
             "age": d["andmete_vanus_h"],
