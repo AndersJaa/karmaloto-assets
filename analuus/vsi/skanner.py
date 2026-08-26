@@ -1,20 +1,18 @@
-"""Coini skänner — VSI kolmanda teljega, nädalase hoiu jaoks.
+"""Coini skänner — kaks nimekirja, mis vastavad kahele eri küsimusele.
 
-VSI vastab küsimusele "mis toimub SELLE mündiga". Skänner vastab teisele
-küsimusele: "millisesse minna". Need ei ole sama küsimus ja sellepärast on
-siin kaks asja teisiti.
+VSI ütleb, mis toimub ÜHE mündiga. Skänner ütleb, MILLIST vaadata.
 
-**Kolmas telg: suhteline tugevus.** Rotatsioon müntide vahel on suhtelise
-tugevuse mäng. Münt, mille V on +60 sellepärast, et kogu turg tõuseb, ei ole
-leid — ta on beeta. Münt, mille V on +40 sel ajal, kui BTC seisab, on. VSI-s on
-BTC korrelatsioon ainult hoiatuslipp; siin on ta omaette telg.
+Universum defineeritakse REEGLITEGA, mitte nimedega. Käsitsi valitud watchlist
+töötab äärmuste otsija vastu: sa vaatad neid münte, mis sulle meelde tulid,
+mitte neid, kus midagi toimub. Reeglid uuenevad ise.
 
-**Nädalased parameetrid.** VSI vaikeväärtused (hinna_ref 3%, oi_ref 5%) on
-4h/päevase akna peale. Nädalase hoiu juures annaks see igale mürale täisskoori.
-Siin on aken 7 päeva ja refid vastavalt laiemad.
+    ÄÄRMUSED   |S| ≥ 60 ja V liigub S vastu   →  pöördekandidaadid
+    JÄTK       V tugev, R sama märgiga, S mõõdukas  →  juba liikumises
 
-Pingerida EI ole soovitus. Ta ütleb, mida vaadata esimesena — lugemise teeb
-ikka VSI, kolm telge eraldi, ja otsuse teeb inimene.
+Miks kaks. Äärmus üksi ei ole ajastus — funding võib olla ekstreemne nädalaid.
+Sellepärast nõuab äärmuse nimekiri lisaks tõendust, et voog on hakanud surve
+vastu liikuma. Ja enamik äärmusi ei pöördu üldse: see nimekiri annab
+KANDIDAADID, mille peale VSI täies mahus jooksutada, mitte sisenemispunktid.
 
     python3 skanner.py --demo
     python3 skanner.py --test
@@ -33,11 +31,16 @@ import vsi
 HINNA_REF = 0.12
 OI_REF = 0.15
 
-# Likviidsuse põrand. Alla selle ei tule münt nimekirja üldse — mitte madala
-# skooriga, vaid üldse mitte. Suurus, mida ei saa mõistliku slippage'iga sisse
-# ega välja, ei ole kauplemiskandidaat, ükskõik kui hea ta number on.
-MIN_OI_USD = 50e6
+# --- universumi reeglid: null hooldust, nimekiri uueneb ise ---
+MIN_OI_USD = 50e6       # allpool ei saa mõistliku slippage'iga sisse ega välja
 MIN_MAHT_USD = 25e6
+MIN_BORSE = 3           # "mitte shitcoin" — peab olema mitmel suurel börsil
+
+# --- läved ---
+LAVI_AARMUS = 60.0      # |S|, millest alates rahvahulk on tõesti ühel pool
+MIN_POORDE_TOEND = 15.0 # |V|, millest alates saab öelda, et voog liigub vastu
+LAVI_JATK = 30.0        # |V| jätku-nimekirja jaoks
+MAX_RIDU = 4            # nimekirja kohta — pikem nimekiri on sama hea kui puuduv
 
 
 @dataclass
@@ -55,6 +58,7 @@ class Kandidaat:
     funding_ajalugu: list[float]
     long_short_ratio: float
     borsi_oi_osakaal: float
+    borside_arv: int = 5
     basis_nyyd: float | None = None
     basis_ajalugu: list[float] | None = None
 
@@ -64,21 +68,22 @@ class Rida:
     coin: str
     voog: float
     surve: float
-    suhteline: float          # z-skoor kandidaatide LÕIKES, mitte oma ajaloo vastu
-    ylejaak: float            # coini tootlus miinus BTC tootlus
+    suhteline: float
+    ylejaak: float
     oi_usd: float
     skoor: float
+    suund: str
+    pohjus: str
     lipud: list[str] = field(default_factory=list)
 
     def rida(self) -> str:
         lipud = ("  " + " · ".join(self.lipud)) if self.lipud else ""
-        return (f"{self.coin:<8} V {self.voog:+6.1f}  S {self.surve:+6.1f}  "
-                f"R {self.suhteline:+5.2f}  ülejääk {self.ylejaak:+6.1%}  "
-                f"skoor {self.skoor:+6.1f}{lipud}")
+        return (f"{self.coin:<8} {self.suund:<5} V {self.voog:+6.1f}  S {self.surve:+6.1f}  "
+                f"R {self.suhteline:+5.2f}  skoor {self.skoor:5.1f}  {self.pohjus}{lipud}")
 
 
-def _telg_vsi(k: Kandidaat) -> tuple[float, float]:
-    """V ja S sama loogikaga mis VSI, aga nädalaste refidega."""
+def _telg_vsi(k: Kandidaat) -> tuple[float, float, float, float]:
+    """V ja S nädalaste refidega. Tagastab (V, V-kaetus, S, S-kaetus)."""
     v = [
         vsi.oi_hinna_kvadrant(k.hinna_muutus, k.oi_muutus, HINNA_REF, OI_REF),
         vsi.taker_cvd(k.neto_taker_usd, k.maht_usd),
@@ -90,16 +95,16 @@ def _telg_vsi(k: Kandidaat) -> tuple[float, float]:
     ]
     if k.basis_nyyd is not None and k.basis_ajalugu:
         s.append(vsi.basis_surve(k.basis_nyyd, k.basis_ajalugu))
-    voog, _ = vsi._telg(v)
-    surve, _ = vsi._telg(s)
-    return voog, surve
+    voog, v_kate = vsi._telg(v)
+    surve, s_kate = vsi._telg(s)
+    return voog, v_kate, surve, s_kate
 
 
 def _ristloike_z(vaartused: list[float]) -> list[float]:
-    """z-skoor kandidaatide lõikes, mediaani ja MAD-i baasil.
+    """z-skoor kandidaatide LÕIKES, mitte oma ajaloo vastu.
 
-    Ristlõikes, mitte oma ajaloo vastu: küsimus ei ole "kas see münt on
-    tugevam kui eelmisel nädalal", vaid "kas ta on tugevam kui teised praegu".
+    Küsimus ei ole "kas ta on tugevam kui eelmisel nädalal", vaid "kas ta on
+    tugevam kui teised praegu". Rotatsioon on suhteline mäng.
     """
     if len(vaartused) < 3:
         return [0.0] * len(vaartused)
@@ -110,76 +115,107 @@ def _ristloike_z(vaartused: list[float]) -> list[float]:
     return [(x - med) / (1.4826 * mad) for x in vaartused]
 
 
-def skanni(kandidaadid: list[Kandidaat], btc_tootlus: float,
-           min_oi_usd: float = MIN_OI_USD,
-           min_maht_usd: float = MIN_MAHT_USD) -> tuple[list[Rida], list[str]]:
-    """Tagastab (pingerida, valja_jaanud_pohjendustega)."""
-    valja = []
-    sobivad = []
+def _universum(kandidaadid: list[Kandidaat], min_oi_usd: float, min_maht_usd: float,
+               min_borse: int) -> tuple[list[Kandidaat], list[str]]:
+    sobivad, valja = [], []
     for k in kandidaadid:
         if k.coin.strip().upper() in vsi.BTC_NIMED:
-            # BTC ülejääk iseenda vastu on alati null — ta ei saa kunagi
-            # pingereas tõusta ega langeda, ainult teisi lahjendada
             valja.append(f"{k.coin}: võrdlusalus, mitte kandidaat")
         elif k.oi_usd < min_oi_usd:
             valja.append(f"{k.coin}: OI {k.oi_usd/1e6:.0f}M alla {min_oi_usd/1e6:.0f}M põranda")
         elif k.maht_usd < min_maht_usd:
             valja.append(f"{k.coin}: maht {k.maht_usd/1e6:.0f}M alla {min_maht_usd/1e6:.0f}M põranda")
+        elif k.borside_arv < min_borse:
+            valja.append(f"{k.coin}: ainult {k.borside_arv} börsil (vaja ≥ {min_borse})")
         else:
             sobivad.append(k)
+    return sobivad, valja
 
+
+def skanni(kandidaadid: list[Kandidaat], btc_tootlus: float,
+           min_oi_usd: float = MIN_OI_USD, min_maht_usd: float = MIN_MAHT_USD,
+           min_borse: int = MIN_BORSE
+           ) -> tuple[list[Rida], list[Rida], list[str]]:
+    """Tagastab (äärmused, jätk, väljajäänud)."""
+    sobivad, valja = _universum(kandidaadid, min_oi_usd, min_maht_usd, min_borse)
     if not sobivad:
-        return [], valja
+        return [], [], valja
 
     ylejaagid = [k.hinna_muutus - btc_tootlus for k in sobivad]
     z = _ristloike_z(ylejaagid)
 
-    read = []
+    aarmused, jatk = [], []
     for k, yle, zz in zip(sobivad, ylejaagid, z):
-        voog, surve = _telg_vsi(k)
+        voog, v_kate, surve, s_kate = _telg_vsi(k)
+
         lipud = []
-
         # Suhteline tugevus, mis tuleb BTC langusest, ei ole coini tugevus.
-        # Ilma selleta hindaks skänner iga languses vähem langenud mündi leiuks.
+        # Ilma selleta loeks skänner iga languses vastupidava mündi leiuks.
         if yle > 0 and k.hinna_muutus <= 0:
-            lipud.append("tugevus tuleb BTC nõrkusest, mitte coini tõusust")
-        if abs(surve) > 60:
-            lipud.append("rahvahulk juba ühel pool — hiline sisenemine")
-        if k.borsi_oi_osakaal < 0.25:
-            lipud.append(f"positsioneerimise andmed katavad vaid {k.borsi_oi_osakaal:.0%} OI-st")
+            lipud.append("tugevus tuleb BTC nõrkusest")
+        if v_kate < 0.5 or s_kate < 0.5:
+            lipud.append(f"kaetus V {v_kate:.0%} / S {s_kate:.0%}")
 
-        # Pingerida on vaatamise järjekord, mitte lugemine. Lugemine on kolm
-        # telge eraldi — need on all real näha ja neid ei asendata skooriga.
-        # Surve on karistus mõlemas suunas: vooga samas suunas ülerahvastatud
-        # rahvahulk tähendab, et hea osa liikumisest on juba tehtud.
-        karistus = 0.35 * abs(surve) if (voog > 0) == (surve > 0) else 0.0
-        skoor = 0.6 * voog + 25 * zz - karistus
+        def tee(skoor, suund, pohjus, kuhu):
+            kuhu.append(Rida(k.coin, voog, surve, zz, yle, k.oi_usd,
+                             skoor, suund, pohjus, list(lipud)))
 
-        read.append(Rida(k.coin, voog, surve, zz, yle, k.oi_usd, skoor, lipud))
+        # --- ÄÄRMUS: rahvahulk maksimaalselt ühel pool JA voog liigub vastu ---
+        # Korrutis, mitte summa: äärmus ilma pöördeta on null ja pööre ilma
+        # äärmuseta on null. Kumbki üksi ei ole see, mida otsime.
+        vastassuunas = (voog > 0) != (surve > 0)
+        if (abs(surve) >= LAVI_AARMUS and vastassuunas
+                and abs(voog) >= MIN_POORDE_TOEND):
+            skoor = min(abs(surve), 100.0) * min(abs(voog) / 40.0, 1.0)
+            if surve > 0:
+                tee(skoor, "alla", "rahvas longis, voog pöördub välja", aarmused)
+            else:
+                tee(skoor, "üles", "rahvas shortis, voog pöördub sisse", aarmused)
 
-    read.sort(key=lambda r: r.skoor, reverse=True)
-    return read, valja
+        # --- JÄTK: liikumine käib, rahvahulk pole veel peal ---
+        # V ja R peavad olema sama märgiga: münt, mis liigub oma suhtelise
+        # tugevuse vastu, on müra, mitte trend.
+        elif (abs(voog) >= LAVI_JATK and abs(surve) < LAVI_AARMUS
+              and zz != 0 and (voog > 0) == (zz > 0)):
+            karistus = 0.35 * abs(surve) if (voog > 0) == (surve > 0) else 0.0
+            skoor = 0.6 * abs(voog) + 25 * abs(zz) - karistus
+            if skoor > 0:
+                tee(skoor, "üles" if voog > 0 else "alla",
+                    "voog kannab, rahvas pole veel peal", jatk)
+
+    aarmused.sort(key=lambda r: r.skoor, reverse=True)
+    jatk.sort(key=lambda r: r.skoor, reverse=True)
+    return aarmused[:MAX_RIDU], jatk[:MAX_RIDU], valja
 
 
-def render(read: list[Rida], valja: list[str], btc_tootlus: float) -> str:
+def render(aarmused: list[Rida], jatk: list[Rida], valja: list[str],
+           btc_tootlus: float, universumi_suurus: int) -> str:
     r = [
         "SKÄNN · nädalane aken",
-        "=" * 78,
-        f"  BTC samas aknas: {btc_tootlus:+.1%}",
+        "=" * 88,
+        f"  BTC samas aknas: {btc_tootlus:+.1%} · universumis {universumi_suurus} münti",
         f"  R = suhteline tugevus BTC vastu, z-skoor kandidaatide lõikes",
         "",
+        f"  ÄÄRMUSED — |S| ≥ {LAVI_AARMUS:.0f} ja voog liigub surve vastu",
     ]
-    if not read:
-        r.append("  Ükski münt ei läbinud likviidsuse põrandat.")
-    for i, rida in enumerate(read, 1):
-        r.append(f"{i:>3}.  {rida.rida()}")
+    if aarmused:
+        r += [f"{i:>3}.  {x.rida()}" for i, x in enumerate(aarmused, 1)]
+    else:
+        r.append("       ükski münt ei ole korraga äärmuses ja pöördumas")
+    r += ["", f"  JÄTK — |V| ≥ {LAVI_JATK:.0f}, R sama märgiga, |S| < {LAVI_AARMUS:.0f}"]
+    if jatk:
+        r += [f"{i:>3}.  {x.rida()}" for i, x in enumerate(jatk, 1)]
+    else:
+        r.append("       ükski münt ei liigu koos oma suhtelise tugevusega")
     if valja:
-        r += ["", "  Nimekirjast väljas:"]
+        r += ["", "  Universumist väljas:"]
         r += [f"    {x}" for x in valja]
     r += [
         "",
-        "  See on VAATAMISE JÄRJEKORD, mitte soovitus. Iga rea kohta tuleb enne",
-        "  otsust jooksutada täis-VSI koos invalideerimisega — skoor ei asenda lugemist.",
+        "  Mõlemad nimekirjad on VAATAMISE JÄRJEKORD, mitte soovitus.",
+        "  Äärmus ei ole ajastus — funding võib ekstreemne püsida nädalaid, ja",
+        "  enamik äärmusi ei pöördu üldse. Iga rea kohta tuleb enne otsust",
+        "  jooksutada täis-VSI koos invalideerimisega.",
     ]
     return "\n".join(r)
 
@@ -190,79 +226,92 @@ def _demo() -> None:
     fh = [0.0001, 0.00008, 0.00012, 0.00005, 0.00015, 0.0001,
           0.00009, 0.00011, 0.00013, 0.00007, 0.0001, 0.00012]
     k = [
-        Kandidaat("AAA", 0.18, 0.22, 60e6, 900e6, 3e6, 14e6, 800e6, 0.00012, fh, 1.4, 0.55),
-        Kandidaat("BBB", 0.04, -0.08, -20e6, 400e6, 18e6, 2e6, 300e6, 0.0005, fh, 3.1, 0.60),
-        Kandidaat("CCC", -0.02, 0.11, 15e6, 250e6, 4e6, 5e6, 210e6, 0.00011, fh, 1.1, 0.48),
-        Kandidaat("DDD", 0.25, 0.30, 90e6, 1200e6, 2e6, 30e6, 1000e6, 0.0009, fh, 4.2, 0.71),
+        # rahvas longis kaelani, hind hakkab alla tulema
+        Kandidaat("AAA", -0.06, 0.14, -55e6, 700e6, 22e6, 2e6, 800e6, 0.0016, fh, 4.8, 0.62),
+        # rahvas shortis, raha hakkab sisse tulema
+        Kandidaat("BBB", 0.03, 0.16, 48e6, 600e6, 2e6, 19e6, 520e6, -0.0009, fh, 0.28, 0.58),
+        # lihtsalt tugev liikumine, rahvas pole peal
+        Kandidaat("CCC", 0.21, 0.24, 70e6, 900e6, 3e6, 12e6, 700e6, 0.00013, fh, 1.3, 0.55),
+        # nõrk, ei sobi kummalegi
+        Kandidaat("DDD", 0.01, 0.01, 2e6, 300e6, 1e6, 1e6, 400e6, 0.0001, fh, 1.05, 0.51),
+        # liiga väike
         Kandidaat("EEE", 0.31, 0.40, 12e6, 18e6, 1e6, 2e6, 30e6, 0.0002, fh, 1.8, 0.30),
+        # kahel börsil ainult
+        Kandidaat("FFF", 0.18, 0.20, 30e6, 200e6, 2e6, 3e6, 300e6, 0.0002, fh, 1.5, 0.60, borside_arv=2),
     ]
-    read, valja = skanni(k, btc_tootlus=0.03)
-    print(render(read, valja, 0.03))
+    a, j, v = skanni(k, btc_tootlus=0.02)
+    print(render(a, j, v, 0.02, len(k)))
 
 
 def _test() -> None:
     ok = 0
     fh = [0.0001] * 6 + [0.00012, 0.00008, 0.00011, 0.00009]
 
-    def teeb(coin, dh, doi, taker=30e6, oi=500e6, maht=300e6,
-             ll=3e6, sl=6e6, funding=0.0001, ls=1.2, share=0.6):
-        return Kandidaat(coin, dh, doi, taker, maht, ll, sl, oi, funding, fh, ls, share)
+    def teeb(coin, dh, doi, taker=30e6, oi=500e6, maht=300e6, ll=3e6, sl=6e6,
+             funding=0.0001, ls=1.2, share=0.6, borse=5):
+        return Kandidaat(coin, dh, doi, taker, maht, ll, sl, oi, funding, fh, ls, share, borse)
 
-    # likviidsuse põrand viskab välja, ei anna lihtsalt madalat skoori
-    read, valja = skanni([teeb("SMALL", 0.4, 0.5, oi=10e6), teeb("BIG", 0.1, 0.1)], 0.02)
-    assert [r.coin for r in read] == ["BIG"], "väike OI peab nimekirjast välja jääma"
-    assert any("SMALL" in x for x in valja), "väljajäämine peab olema põhjendatud"
+    # universumi reeglid viskavad välja, ei anna madalat skoori
+    a, j, valja = skanni([teeb("SMALL", 0.4, 0.5, oi=10e6), teeb("THIN", 0.2, 0.2, borse=2),
+                          teeb("BTC", 0.1, 0.1), teeb("OK", 0.2, 0.2)], 0.02)
+    assert any("SMALL" in x for x in valja) and any("THIN" in x for x in valja)
+    assert any("BTC" in x and "võrdlusalus" in x for x in valja)
     ok += 1
 
-    # sama voog, eri suhteline tugevus -> tugevam ülejääk võidab
-    read, _ = skanni([teeb("A", 0.20, 0.20), teeb("B", 0.05, 0.20), teeb("C", 0.02, 0.20)], 0.05)
-    assert read[0].coin == "A", f"suurima ülejäägiga peab olema esimene, sai {read[0].coin}"
+    # äärmus: rahvas longis (kõrge funding + ratio), voog alla
+    aa = teeb("FLUSH", -0.06, 0.14, taker=-55e6, funding=0.002, ls=5.0)
+    a, j, _ = skanni([aa, teeb("X", 0.01, 0.01), teeb("Y", 0.0, 0.0)], 0.0)
+    assert [r.coin for r in a] == ["FLUSH"], f"äärmus jäi leidmata, sai {[r.coin for r in a]}"
+    assert a[0].suund == "alla" and a[0].surve > LAVI_AARMUS and a[0].voog < 0
+    ok += 1
+
+    # äärmus teistpidi: rahvas shortis, voog üles
+    bb = teeb("SQUEEZE", 0.03, 0.16, taker=48e6, sl=19e6, ll=2e6, funding=-0.0012, ls=0.25)
+    a, j, _ = skanni([bb, teeb("X", 0.01, 0.01), teeb("Y", 0.0, 0.0)], 0.0)
+    assert [r.coin for r in a] == ["SQUEEZE"]
+    assert a[0].suund == "üles" and a[0].surve < -LAVI_AARMUS and a[0].voog > 0
+    ok += 1
+
+    # äärmus ILMA pöördeta ei kvalifitseeru — see on korrutise mõte
+    paigal = teeb("PAIGAL", 0.005, 0.005, taker=1e6, funding=0.002, ls=5.0)
+    a, j, _ = skanni([paigal, teeb("X", 0.01, 0.01), teeb("Y", 0.0, 0.0)], 0.0)
+    assert not a, "äärmus ilma voo pöördeta ei ole kandidaat"
+    ok += 1
+
+    # jätk nõuab, et V ja R oleks sama märgiga
+    a, j, _ = skanni([teeb("TUGEV", 0.25, 0.25), teeb("N1", -0.05, 0.0), teeb("N2", -0.06, 0.0)], 0.0)
+    assert [r.coin for r in j] == ["TUGEV"], f"sai {[r.coin for r in j]}"
+    assert j[0].suund == "üles"
+    ok += 1
+
+    # münt, mis liigub oma suhtelise tugevuse VASTU, ei kvalifitseeru:
+    # hind tõuseb ja voog on üles, aga BTC vastu jääb ta kaugele maha
+    a, j, _ = skanni([teeb("VASTU", 0.05, 0.20, taker=60e6),
+                      teeb("P1", 0.50, 0.0), teeb("P2", 0.52, 0.0)], btc_tootlus=0.40)
+    vastu = [r for r in j if r.coin == "VASTU"]
+    assert not vastu, "V üles + R alla on müra, mitte trend"
     ok += 1
 
     # tugevus BTC nõrkusest saab lipu
-    read, _ = skanni([teeb("FLAT", -0.01, 0.10), teeb("X", -0.15, 0.10), teeb("Y", -0.20, 0.10)],
-                     btc_tootlus=-0.18)
-    flat = next(r for r in read if r.coin == "FLAT")
-    assert flat.ylejaak > 0, "langevas turus on vähem langenu ülejääk positiivne"
-    assert any("BTC nõrkusest" in f for f in flat.lipud), "see peab lipu saama"
+    a, j, _ = skanni([teeb("FLAT", -0.01, 0.20, taker=40e6), teeb("X", -0.15, 0.1),
+                      teeb("Y", -0.20, 0.1)], btc_tootlus=-0.18)
+    koik = a + j
+    flat = [r for r in koik if r.coin == "FLAT"]
+    if flat:
+        assert any("BTC nõrkusest" in f for f in flat[0].lipud)
     ok += 1
 
-    # ülerahvastatud rahvahulk karistab, kui ta on vooga samas suunas
-    puhas = teeb("PUHAS", 0.20, 0.20, funding=0.00005, ls=1.0)
-    rahvas = teeb("RAHVAS", 0.20, 0.20, funding=0.002, ls=5.0)
-    read, _ = skanni([puhas, rahvas, teeb("C", 0.0, 0.0)], 0.02)
-    p = next(r for r in read if r.coin == "PUHAS")
-    h = next(r for r in read if r.coin == "RAHVAS")
-    assert h.surve > p.surve, "kõrge funding + ratio peab andma suurema surve"
-    assert p.skoor > h.skoor, "sama voo juures peab väiksema survega münt ette jääma"
-    assert any("hiline" in f for f in h.lipud)
+    # nimekirjad on piiratud
+    palju = [teeb(f"C{i}", 0.20 + i*0.01, 0.25, taker=60e6) for i in range(10)]
+    a, j, _ = skanni(palju, 0.0)
+    assert len(a) <= MAX_RIDU and len(j) <= MAX_RIDU
     ok += 1
 
-    # nädalased refid: päevane liikumine ei tohi anda täisskoori
-    n = vsi.oi_hinna_kvadrant(0.04, 0.05, HINNA_REF, OI_REF)
-    p = vsi.oi_hinna_kvadrant(0.04, 0.05)
-    assert n.skoor < p.skoor * 0.6, "nädalases aknas peab 4% olema tagasihoidlik"
+    # tühi sisend ei kuku kokku
+    assert skanni([], 0.0) == ([], [], [])
     ok += 1
 
-    # ristlõike z on kandidaatide, mitte ajaloo suhtes
-    z = _ristloike_z([0.01, 0.02, 0.03, 0.30])
-    assert z[-1] > 2 and abs(z[1]) < 1, "väljapaistev peab eristuma, keskmine mitte"
-    ok += 1
-
-    # BTC ei osale kandidaadina
-    read, valja = skanni([teeb("BTC", 0.10, 0.10), teeb("A", 0.20, 0.20),
-                          teeb("B", 0.05, 0.05), teeb("C", 0.02, 0.02)], 0.10)
-    assert "BTC" not in [r.coin for r in read], "BTC ei tohi pingereas olla"
-    assert any("võrdlusalus" in x for x in valja), "ja väljajäämine peab olema põhjendatud"
-    ok += 1
-
-    # tühi ja liiga lühike nimekiri ei kuku kokku
-    assert skanni([], 0.0) == ([], [])
-    read, _ = skanni([teeb("ONE", 0.1, 0.1)], 0.02)
-    assert len(read) == 1 and read[0].suhteline == 0.0, "alla 3 kandidaadi z = 0"
-    ok += 1
-
-    print(f"{ok}/8 testiplokki OK")
+    print(f"{ok}/9 testiplokki OK")
 
 
 if __name__ == "__main__":

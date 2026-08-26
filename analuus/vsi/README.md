@@ -130,29 +130,62 @@ python3 skanner.py --test
 ```
 
 `skanner.py` vastab teisele küsimusele kui VSI. VSI ütleb, mis toimub **selle**
-mündiga; skänner ütleb, **millisesse minna**. Kaks asja on seetõttu teisiti:
+mündiga; skänner ütleb, **millist vaadata**.
 
-**Kolmas telg — suhteline tugevus (R).** Rotatsioon müntide vahel on suhtelise
-tugevuse mäng. Münt, mille V on +60 sellepärast, et kogu turg tõuseb, ei ole
-leid — ta on beeta. R on z-skoor **kandidaatide lõikes**, mitte mündi oma ajaloo
-vastu: küsimus pole "kas ta on tugevam kui eelmisel nädalal", vaid "kas ta on
-tugevam kui teised praegu".
+### Universum on reeglid, mitte nimekiri
 
-**Nädalased parameetrid.** `HINNA_REF` 12% ja `OI_REF` 15% VSI 3% / 5% asemel.
-Päevase akna refidega annaks nädalane müra igale mündile täisskoori.
+Käsitsi valitud watchlist töötab äärmuste otsija vastu: sa vaatad neid münte, mis
+sulle meelde tulid, mitte neid, kus midagi toimub. Universum defineeritakse
+reeglitega ja uueneb ise:
 
-Kaks asja, mis skännil ise ära tehakse:
+| Reegel | Miks |
+|---|---|
+| OI ≥ 50M USD | allpool ei saa mõistliku slippage'iga sisse ega välja |
+| Maht ≥ 25M USD | sama |
+| Vähemalt 3 börsil | „mitte shitcoin" — üheainsa börsi münt ei ole kaubeldav |
+| BTC välja | võrdlusalus, mitte kandidaat — tema ülejääk iseenda vastu on null |
 
-- **Likviidsuse põrand** (OI ≥ 50M, maht ≥ 25M) viskab mündi nimekirjast **välja**,
-  mitte ei anna madalat skoori. Suurus, mida ei saa mõistliku slippage'iga sisse
-  ega välja, pole kandidaat, ükskõik kui ilus number tal on.
-- **„Tugevus tuleb BTC nõrkusest"** lipp. Langevas turus on iga vähem langenud
-  münt positiivse ülejäägiga. Ilma selle liputa loeks skänner iga kukkumises
-  vastupidava mündi leiuks.
+Väljajäänud **loetletakse põhjendusega**. Vaikne kadumine nimekirjast loeks nagu
+„ei olnud huvitav", mitte „ei mahtunud reeglitest läbi".
 
-Surve on skoori juures **karistus mõlemas suunas** — kui rahvahulk on vooga samas
-suunas ülerahvastatud, on hea osa liikumisest juba tehtud.
+### Kaks nimekirja, kaks eri küsimust
 
-Pingerida on **vaatamise järjekord, mitte soovitus.** Kolm telge on real eraldi
-näha ja skoor neid ei asenda — iga rea kohta tuleb enne otsust jooksutada täis-VSI
-koos invalideerimisega.
+**ÄÄRMUSED** — `|S| ≥ 60` **ja** voog liigub surve vastu **ja** `|V| ≥ 15`
+
+Rahvahulk on maksimaalselt ühel pool ja raha on hakanud teistpidi liikuma.
+Skoor on **korrutis**, mitte summa: äärmus ilma pöördeta on null ja pööre ilma
+äärmuseta on null. Kumbki üksi ei ole see, mida otsitakse.
+
+| Seis | Suund |
+|---|---|
+| S tugevalt +, V pöördub − | alla — longide väljasurumine algab |
+| S tugevalt −, V pöördub + | üles — squeeze algab |
+
+**JÄTK** — `|V| ≥ 30`, `R` sama märgiga, `|S| < 60`
+
+Liikumine käib ja rahvahulk pole veel peal. **V ja R peavad olema sama märgiga:**
+münt, mis liigub oma suhtelise tugevuse vastu, on müra, mitte trend. Surve annab
+karistuse, kui ta on vooga samas suunas — siis on hea osa liikumisest juba tehtud.
+
+Mõlemas nimekirjas maksimaalselt 4 rida. Pikem nimekiri on sama hea kui puuduv.
+
+### Kolmas telg: suhteline tugevus (R)
+
+Rotatsioon müntide vahel on suhtelise tugevuse mäng. Münt, mille V on +60
+sellepärast, et kogu turg tõuseb, ei ole leid — ta on beeta. R on z-skoor
+**kandidaatide lõikes**, mitte mündi oma ajaloo vastu: küsimus pole „kas ta on
+tugevam kui eelmisel nädalal", vaid „kas ta on tugevam kui teised praegu".
+
+Lipp **„tugevus tuleb BTC nõrkusest"**: langevas turus on iga vähem langenud münt
+positiivse ülejäägiga. Ilma selle liputa loeks skänner iga vastupidaja leiuks.
+
+### Nädalased parameetrid
+
+`HINNA_REF` 12% ja `OI_REF` 15% VSI 3% / 5% asemel. Päevase akna refidega annaks
+nädalane müra igale mündile täisskoori.
+
+### Mida see EI ole
+
+Kumbki nimekiri ei ole soovitus ega sisenemispunkt. **Äärmus ei ole ajastus** —
+funding võib ekstreemne püsida nädalaid — ja enamik äärmusi ei pöördu üldse.
+Nimekiri annab kandidaadid, mille peale VSI täies mahus jooksutada.
