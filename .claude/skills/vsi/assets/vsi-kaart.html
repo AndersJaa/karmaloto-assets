@@ -375,12 +375,16 @@
     return {V,S};
   }
 
+  // Kaetust mõõdetakse telje TÄISKAALU vastu, mitte kaasa antud komponentide
+  // summa vastu. Muidu parandaks komponendi ärajätmine kaetuse numbrit — mida
+  // vähem andmeid, seda terveni telg paistab.
+  const TAISKAAL = 100;
   function axis(list){
     const on = list.filter(c=>c.on);
     const wOn = on.reduce((a,c)=>a+c.w,0);
-    const wAll = list.reduce((a,c)=>a+c.w,0);
     if(!wOn) return {val:0, cover:0, wOn:0};
-    return {val: on.reduce((a,c)=>a+c.s*c.w,0)/wOn*100, cover: wOn/wAll, wOn};
+    return {val: on.reduce((a,c)=>a+c.s*c.w,0)/wOn*100,
+            cover: Math.min(wOn/TAISKAAL, 1), wOn};
   }
 
   const QUAD = {

@@ -50,7 +50,7 @@ Null näeb välja nagu andmed ja annab lugemise, mis on vaikselt vale.
 | `oi_usd` | `oi_history action=aggregated`, viimane | USD |
 | `spot_voog_usd` | päevased netovood — **ainult BTC/ETH, mujal jäta välja** | USD |
 | `funding_nyyd_pct`, `funding_ajalugu_pct` | `funding_history action=oi_weighted`, ≥ 8 punkti | % |
-| `basis_nyyd_pct`, `basis_ajalugu_pct` | kvartalifutuur vs spot, ≥ 8 punkti | % |
+| `basis_nyyd_pct`, `basis_ajalugu_pct` | kvartalifutuur vs spot, ≥ 8 punkti — **jäta välja, kui mündil kvartalifutuuri pole** | % |
 | `long_short_ratio` | `long_short action=global` — **domineerivalt börsilt, mitte vaikimisi Binance'ilt** | suhtarv |
 | `borsi_oi_osakaal` | `oi_distribution by_exchange`, selle **sama** börsi osa | 0…1 |
 | `andmete_vanus_h` | vanim kasutatud andmepunkt | tundi |
@@ -115,8 +115,10 @@ Mida snapshot **hästi** annab: õige mark price tema enda venue'ilt (mitte asen
 börsilt), OI trendi suuna ja valaskannu. Kasuta seda hinna ja konteksti jaoks —
 ja ütle välja, et see on kontekst, mitte lugemine.
 
-Kaetuse põrand on koodis: kui telje kaalust on kaetud alla poole, keeldub
-`kvadrant()` verdiktist ja ütleb, kumb telg on puudulik. Ühest ellujäänud
+Kaetuse põrand on koodis: kui telje **täiskaalust** on kaetud alla poole, keeldub
+`kvadrant()` verdiktist ja ütleb, kumb telg on puudulik. Nimetaja on telje
+täiskaal (100), mitte kaasa antud komponentide summa — muidu parandaks komponendi
+ärajätmine kaetuse numbrit. Ühest ellujäänud
 komponendist saaks muidu uhke V = 100, mille kõrval madal usaldusväärsuse
 protsent on kõrvalmärkus, mida keegi ei loe.
 
@@ -145,6 +147,11 @@ Neid ei pea käsitsi jälgima — skript teeb ja kirjutab välja:
 
 - **Likvideerimised alla 0.5% OI-st** lülituvad välja kui müra ja nende kaal
   jaotub teiste komponentide vahel ümber. 90/10 jaotus 0.1% pealt ei ole kaskaad.
+- **Kõik mündid ei anna täit S-telge.** HYPE-l ei toeta Hyperliquid
+  `global-long-short-account-ratio` endpointi ja kvartalifutuuri pole, seega
+  jäävad long/short ja basis mõlemad ära ning S seisab ainult fundingu peal —
+  45% täiskaalust, alla põranda. **See ei ole viga, vaid õige vastus:** öelda,
+  kus rahvahulk on, ei saa ühe näitaja pealt. Ütle see välja, ära otsi asendust.
 - **Long/short lülitub välja, kui börs katab alla ~25% OI-st.** Vale venue ei ole
   nõrk andmepunkt — ta ei ole andmepunkt. HYPE puhul tähendab see Hyperliquidi
   (56,9% OI-st), mitte Binance'i (11,2%): Binance'ilt võetud ratio jätab S-telje

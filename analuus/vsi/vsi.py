@@ -85,15 +85,29 @@ class Komponent:
         return 100.0 * self.skoor * self.kaal / kaalude_summa if kaalude_summa else 0.0
 
 
-def _telg(komponendid: list[Komponent]) -> tuple[float, float]:
-    """Tagastab (telje väärtus -100..100, kaetud kaalu osakaal 0..1)."""
+# Telje täiskaal. Kaetust mõõdetakse SELLE, mitte kaasa antud komponentide
+# summa vastu. Vahe on oluline: kui nimetaja on kaasa antute summa, siis
+# komponendi ärajätmine PARANDAB kaetuse numbrit — mida vähem andmeid, seda
+# terveni telg paistab. HYPE-l juhtus täpselt see: basis puudub (kvartalifutuuri
+# pole) ja long/short lülitub välja (Hyperliquid ei anna ratiot), S seisab
+# ainult fundingu peal, aga näitas 64% kaetust.
+V_TAISKAAL = 100.0
+S_TAISKAAL = 100.0
+
+
+def _telg(komponendid: list[Komponent], taiskaal: float | None = None) -> tuple[float, float]:
+    """Tagastab (telje väärtus -100..100, kaetud osa täiskaalust 0..1).
+
+    `taiskaal=None` mõõdab kaasa antute summa vastu — seda kasutab skänner,
+    mis teadlikult jätab osa komponente välja ega taotle täiskatvust.
+    """
     kehtivad = [k for k in komponendid if k.kehtiv]
     kaalud = sum(k.kaal for k in kehtivad)
-    kogukaal = sum(k.kaal for k in komponendid)
-    if kaalud == 0:
+    nimetaja = taiskaal if taiskaal is not None else sum(k.kaal for k in komponendid)
+    if kaalud == 0 or nimetaja == 0:
         return 0.0, 0.0
     vaartus = sum(k.skoor * k.kaal for k in kehtivad) / kaalud * 100.0
-    return vaartus, kaalud / kogukaal
+    return vaartus, min(kaalud / nimetaja, 1.0)
 
 
 # --------------------------------------------------------------------------
@@ -481,8 +495,8 @@ def arvuta(coin: str, v_komponendid: list[Komponent], s_komponendid: list[Kompon
            adx_vaartus: float = 25.0, chop_vaartus: float = 50.0,
            hind_ule_ema200: bool = True,
            invalideerimine: str | None = None) -> Lugemine:
-    voog, v_kate = _telg(v_komponendid)
-    surve, s_kate = _telg(s_komponendid)
+    voog, v_kate = _telg(v_komponendid, V_TAISKAAL)
+    surve, s_kate = _telg(s_komponendid, S_TAISKAAL)
     varavad.on_btc = coin.strip().upper() in BTC_NIMED
     return Lugemine(coin, voog, surve, v_kate, s_kate, varavad,
                     volatiliteedi_reziim(atr_pertsentiil),
@@ -604,6 +618,17 @@ def _test() -> None:
         pass
     ok += 1
 
+    # puuduv komponent EI tohi kaetuse numbrit parandada
+    ainult_funding = [Komponent("Funding", -1.0, 45, "", "")]  # basis ja L/S puuduvad hoopis
+    val, kate = _telg(ainult_funding, S_TAISKAAL)
+    assert abs(kate - 0.45) < 1e-9, f"kaetus peab olema 45%, sai {kate:.0%}"
+    vana_moodi, vana_kate = _telg(ainult_funding)
+    assert vana_kate == 1.0, "kaasa antute summa vastu mõõtes paistaks see 100% kaetud"
+    lug = arvuta("HYPE", [Komponent("v", 0.9, 100, "", "")], ainult_funding,
+                 Varavad(), 0.5, invalideerimine="t")
+    assert lug.kvadrant()[0] == "LUGEMIST EI OLE", "ainult funding ei ole S-telg"
+    ok += 1
+
     # kaetuse põrand: pool telge puudu = lugemist ei ole, ükskõik kui kõrge number
     poolik = arvuta("X",
                     [Komponent("on", 1.0, 35, "", ""),
@@ -694,7 +719,7 @@ def _test() -> None:
     assert kokku.reziim[0] == "kokku surutud" and lai.reziim[0] == "laienenud"
     ok += 1
 
-    print(f"{ok}/16 testiplokki OK")
+    print(f"{ok}/17 testiplokki OK")
 
 
 if __name__ == "__main__":
