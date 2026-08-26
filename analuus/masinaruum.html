@@ -1,0 +1,407 @@
+<title>Masinaruum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --paper:#F4F5F7; --card:#FFFFFF;
+    --ink:#15181D; --ink-2:#3E4650; --muted:#5B6471;
+    --rule:#DCE0E6; --rule-soft:#E9ECF0;
+    --pos:#008F74; --neg:#C0421C;
+    --pos-wash:#008F7414; --neg-wash:#C0421C10; --dead:#5B647110;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#101318; --card:#171B21;
+      --ink:#E6E9ED; --ink-2:#C3CAD3; --muted:#98A2B0;
+      --rule:#2A313A; --rule-soft:#222831;
+      --pos:#23A98D; --neg:#D46A45;
+      --pos-wash:#23A98D1C; --pos-wash:#23A98D1C; --neg-wash:#D46A4514; --dead:#98A2B012;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#101318; --card:#171B21;
+    --ink:#E6E9ED; --ink-2:#C3CAD3; --muted:#98A2B0;
+    --rule:#2A313A; --rule-soft:#222831;
+    --pos:#23A98D; --neg:#D46A45;
+    --pos-wash:#23A98D1C; --neg-wash:#D46A4514; --dead:#98A2B012;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Public Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+    font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px 96px}
+
+  header.top{display:flex; flex-direction:column; gap:18px; padding:72px 0 30px; border-bottom:1px solid var(--rule)}
+  .eyebrow{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin:0}
+  h1{font-family:"Newsreader",Georgia,serif; font-weight:600; font-size:clamp(2.4rem,6vw,3.9rem); line-height:1.03; letter-spacing:-.02em; margin:0; text-wrap:balance}
+  .stand{max-width:62ch; color:var(--muted); font-size:1.06rem; margin:0}
+  .stand strong{color:var(--ink); font-weight:600}
+
+  nav.idx{position:sticky; top:0; z-index:5; display:flex; gap:2px; flex-wrap:wrap; background:var(--paper); border-bottom:1px solid var(--rule); padding:10px 0; margin-bottom:6px}
+  nav.idx a{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.06em; text-transform:uppercase; text-decoration:none; color:var(--muted); padding:5px 9px; border:1px solid transparent}
+  nav.idx a:hover,nav.idx a:focus-visible{color:var(--pos); border-color:var(--rule)}
+
+  section{padding:46px 0 0; border-top:1px solid var(--rule-soft)}
+  section:first-of-type{border-top:none}
+  .sh{display:flex; gap:16px; align-items:baseline; margin-bottom:8px}
+  .sk{font-family:"IBM Plex Mono",monospace; font-size:.95rem; font-weight:500; color:var(--pos); min-width:1.6em}
+  h2{font-family:"Newsreader",Georgia,serif; font-weight:600; font-size:clamp(1.55rem,3vw,2.1rem); line-height:1.15; letter-spacing:-.015em; margin:0; text-wrap:balance}
+  h3{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted); font-weight:500; margin:30px 0 12px}
+  p{max-width:70ch; color:var(--ink-2)}
+  p.lead{color:var(--ink); font-size:1.02rem}
+  strong{color:var(--ink); font-weight:600}
+  code{font-family:"IBM Plex Mono",monospace; font-size:.85em; background:var(--dead); padding:1px 5px}
+  a{color:var(--pos)}
+
+  .scroller{overflow-x:auto; border:1px solid var(--rule); background:var(--card); margin:14px 0}
+  table{border-collapse:collapse; width:100%; min-width:640px; font-size:.92rem}
+  th{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); text-align:left; padding:11px 14px; border-bottom:1px solid var(--rule); font-weight:500; white-space:nowrap}
+  td{padding:12px 14px; border-bottom:1px solid var(--rule-soft); vertical-align:top; color:var(--ink-2)}
+  tr:last-child td{border-bottom:none}
+  td.n{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink)}
+  td.k{font-weight:600; color:var(--ink)}
+
+  figure{margin:24px 0; background:var(--card); border:1px solid var(--rule); padding:22px}
+  figure svg{display:block; width:100%; height:auto; color:var(--ink-2)}
+  figcaption{font-size:.86rem; color:var(--muted); margin-top:14px; max-width:66ch}
+  .sv-box{fill:var(--card); stroke:currentColor; stroke-width:1}
+  .sv-key{fill:var(--pos-wash); stroke:var(--pos); stroke-width:1.5}
+  .sv-t{font-family:"Public Sans",sans-serif; font-size:12px; fill:var(--ink)}
+  .sv-m{font-family:"IBM Plex Mono",monospace; font-size:10px; fill:var(--muted)}
+  .sv-band{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.12em; fill:var(--muted)}
+  .sv-line{stroke:currentColor; stroke-width:1.2; fill:none}
+  .sv-div{stroke:var(--muted); stroke-width:1; stroke-dasharray:3 4; opacity:.5}
+  .sv-q{font-family:"IBM Plex Mono",monospace; font-size:9.5px; fill:var(--ink-2)}
+
+  .cards{display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); margin-top:18px}
+  .card{background:var(--card); border:1px solid var(--rule); padding:18px 20px}
+  .card h4{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; font-weight:500}
+  .card p{margin:0; font-size:.93rem}
+  .card.warn{border-color:var(--neg); background:var(--neg-wash)}
+  .card.warn h4{color:var(--neg)}
+
+  pre{background:var(--card); border:1px solid var(--rule); padding:14px 16px; overflow-x:auto; font-family:"IBM Plex Mono",monospace; font-size:.84rem; line-height:1.5; color:var(--ink); margin:14px 0}
+  ul{max-width:70ch; color:var(--ink-2); padding-left:20px}
+  li{margin:7px 0}
+
+  .bug{border-left:2px solid var(--neg); padding:2px 0 2px 18px; margin:20px 0; max-width:72ch}
+  .bug b{display:block; color:var(--ink); font-weight:600; margin-bottom:3px}
+  .bug .cost{display:block; margin-top:7px; color:var(--neg); font-size:.9rem}
+
+  footer{margin-top:56px; padding-top:24px; border-top:1px solid var(--rule); color:var(--muted); font-size:.9rem}
+  :focus-visible{outline:2px solid var(--pos); outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+  @media (max-width:640px){ .wrap{padding:0 16px 64px} header.top{padding-top:44px} }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">Seletuskiri · 26. august 2026</p>
+  <h1>Masinaruum</h1>
+  <p class="stand">Mis sai ehitatud, miks iga tükk just niimoodi, ja mis läheb katki, kui keegi mõne värava välja võtab.
+  Süsteem on üles ehitatud ühe idee ümber: <strong>arv, mille päritolu ei ole teada, on halvem kui arvu puudumine.</strong></p>
+</header>
+
+<nav class="idx" aria-label="Sisukord">
+  <a href="#mis">1 · Mis see on</a><a href="#vsi">2 · VSI</a><a href="#varavad">3 · Väravad</a>
+  <a href="#ahel">4 · Ahel</a><a href="#skanner">5 · Skänner</a><a href="#kasutus">6 · Kasutus</a>
+  <a href="#vead">7 · Vead</a><a href="#pole">8 · Mis see ei ole</a>
+</nav>
+
+<section id="mis">
+  <div class="sh"><span class="sk">1</span><h2>Mis see on</h2></div>
+  <p class="lead">Kolm osa, mis vastavad kolmele eri küsimusele. Neid ei ole mõtet segamini ajada —
+  iga osa on kasutu teise küsimuse peal.</p>
+
+  <div class="scroller"><table>
+    <thead><tr><th>Osa</th><th>Küsimus</th><th>Kus ta elab</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Koondtabel</td><td>Mis turgudel üldse korduvalt kordub, ja kui usaldusväärne iga muster on</td><td class="n">analuus/turu-seadusparasused.md</td></tr>
+      <tr><td class="k">VSI</td><td>Mis toimub <em>selle</em> mündiga praegu</td><td class="n">analuus/vsi/vsi.py</td></tr>
+      <tr><td class="k">Skänner</td><td><em>Millist</em> münti üldse vaadata</td><td class="n">analuus/vsi/skanner.py</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Koondtabel on alus: seal on 40+ turumustrit viidud ühele kujule — <strong>mis see on → mis ajaraamis →
+  kuidas mõõta → kui usaldusväärne → kuidas läbi kukub</strong>. VSI ja skänner kasutavad sellest ainult
+  neid ridu, mis said hindeks 4 või 5, ehk mehaaniliselt mõõdetavaid.</p>
+
+  <p>Elliott, Gann ja Wyckoff said hinded 1–3 ja jäid VSI-st <strong>teadlikult välja</strong>. Mitte sellepärast,
+  et nad oleks väärtusetud, vaid sellepärast, et nad on tõlgendus. Kui subjektiivne sisend liigutab numbrit,
+  mis näeb objektiivne välja, siis number valetab veenvamalt kui inimene.</p>
+</section>
+
+<section id="vsi">
+  <div class="sh"><span class="sk">2</span><h2>VSI — kaks telge, mida ei liideta</h2></div>
+  <p class="lead">Kogu indikaatori mõte on ühes otsuses: <strong>V ja S jäävad lahku.</strong></p>
+
+  <figure>
+    <svg viewBox="0 0 380 320" role="img" aria-label="Kvadrandikaart: voog vaakartelil, surve püsttelil, neli nimetatud kvadranti">
+      <rect x="50" y="30" width="280" height="240" class="sv-box"/>
+      <line x1="50" y1="150" x2="330" y2="150" class="sv-div"/>
+      <line x1="190" y1="30" x2="190" y2="270" class="sv-div"/>
+      <text x="120" y="72" text-anchor="middle" class="sv-q">LONGIDE</text>
+      <text x="120" y="84" text-anchor="middle" class="sv-q">VÄLJASURUMINE</text>
+      <text x="260" y="72" text-anchor="middle" class="sv-q">ÜLEKUUMENENUD</text>
+      <text x="260" y="84" text-anchor="middle" class="sv-q">TÕUS</text>
+      <text x="120" y="228" text-anchor="middle" class="sv-q">SHORTIDE KÜTUS</text>
+      <text x="260" y="228" text-anchor="middle" class="sv-q">PUHAS TÕUS</text>
+      <text x="190" y="20" text-anchor="middle" class="sv-m">S +100 · rahvas longis</text>
+      <text x="190" y="288" text-anchor="middle" class="sv-m">S −100 · rahvas shortis</text>
+      <text x="326" y="144" text-anchor="end" class="sv-m">V +100</text>
+      <text x="54" y="144" text-anchor="start" class="sv-m">V −100</text>
+      <rect x="176" y="30" width="28" height="240" fill="var(--dead)"/>
+      <text x="190" y="310" text-anchor="middle" class="sv-m">hall riba: |V| alla läve — lugemist ei ole</text>
+    </svg>
+    <figcaption>Voog ütleb, mida raha praegu teeb; surve ütleb, kui ühel pool rahvahulk on.
+    Tõus madala survega („puhas tõus") ja tõus kõrge survega („ülekuumenenud") on vastandid, kuigi
+    mõlemal on V positiivne. Üks liidetud number näitaks mõlemal juhul „+70" ja kaotaks selle vahe ära.</figcaption>
+  </figure>
+
+  <h3>Komponendid ja kaalud</h3>
+  <div class="scroller"><table>
+    <thead><tr><th>Telg</th><th>Komponent</th><th>Kaal</th><th>Allikas</th></tr></thead>
+    <tbody>
+      <tr><td class="n">V</td><td class="k">OI + hinna kvadrant</td><td class="n">35</td><td class="n">oi_history aggregated + price_history</td></tr>
+      <tr><td class="n">V</td><td class="k">Taker CVD</td><td class="n">30</td><td class="n">taker coin_history</td></tr>
+      <tr><td class="n">V</td><td class="k">Likvideerimised</td><td class="n">20</td><td class="n">liq_history aggregated</td></tr>
+      <tr><td class="n">V</td><td class="k">Spot / ETF voog</td><td class="n">15</td><td class="n">ainult BTC ja ETH</td></tr>
+      <tr><td class="n">S</td><td class="k">Funding</td><td class="n">45</td><td class="n">funding_history oi_weighted</td></tr>
+      <tr><td class="n">S</td><td class="k">Basis</td><td class="n">30</td><td class="n">kvartalifutuur vs spot</td></tr>
+      <tr><td class="n">S</td><td class="k">Long / short</td><td class="n">25</td><td class="n">long_short global + oi_distribution</td></tr>
+    </tbody>
+  </table></div>
+  <p>Long/short sai teadlikult madalaima kaalu ja ainsana kohustusliku börsikontrolli: <strong>kontode arv ei ole
+  raha.</strong> Funding sai kõrgeima, sest ta on ainus surve mõõt, mis on korraga mehaaniline ja mitme börsi peale
+  kaalutud.</p>
+</section>
+
+<section id="varavad">
+  <div class="sh"><span class="sk">3</span><h2>Väravad — kus süsteem keeldub vastamast</h2></div>
+  <p class="lead">Iga värav on koodis, mitte kommentaaris. Neid ei pea meeles pidama ega käsitsi jälgima —
+  nad lülituvad ise sisse ja kirjutavad põhjuse välja.</p>
+
+  <div class="scroller"><table>
+    <thead><tr><th>Värav</th><th>Reegel</th><th>Mida ta takistab</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Invalideerimine</td><td>Ilma selleta <code>render()</code> viskab vea</td><td>Lugemine, mida ei saa kunagi valeks tunnistada — ehk mitte lugemine, vaid arvamus</td></tr>
+      <tr><td class="k">Likvideerimiste müra</td><td>Alla 0.5% OI-st → komponent välja</td><td>90/10 jaotus 0.1% pealt, mis näeb välja nagu kaskaad, aga on kolm inimest</td></tr>
+      <tr><td class="k">Börsi kaal</td><td>Alla 25% OI-st → long/short välja</td><td>Binance'i 11% esitamine rahvahulgana, kui turg on tegelikult mujal</td></tr>
+      <tr><td class="k">Kaetuse põrand</td><td>Alla 50% telje täiskaalust → lugemist ei anta</td><td>Üks ellujäänud komponent, mis haarab terve telje ja annab uhke V = 100</td></tr>
+      <tr><td class="k">Voo lävi</td><td>|V| alla 25 (külgsuunas 40) → lugemist ei anta</td><td>Stsenaariumide tootmine olukorras, kus andmed ei ütle midagi</td></tr>
+      <tr><td class="k">Režiim</td><td>ADX &lt; 20 VÕI Chop &gt; 61.8 → lävi tõuseb</td><td>Külgsuunalise turu valemurdude lugemine trendiks</td></tr>
+      <tr><td class="k">BTC juht</td><td>|korrelatsioon| ≥ 0.80 → lipp</td><td>Coini enda andmete lugemine siis, kui ta liigub BTC peale</td></tr>
+      <tr><td class="k">Andmete vanus</td><td>Üle 3h → usaldusväärsus langeb</td><td>Eilse pildi esitamine tänasena</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cards">
+    <div class="card">
+      <h4>Kaks väravat, mis üksteist katavad</h4>
+      <p>Börsi kaal lülitab long/shorti välja. Kaetuse põrand loeb siis, kui palju S-teljest üldse alles jäi.
+      Esimene üksi ei piisanud — komponent lülitus välja, aga tema kaal luges kaetuse arvestuses edasi täiega.</p>
+    </div>
+    <div class="card warn">
+      <h4>Miks nimetaja on täiskaal</h4>
+      <p>Kaetust mõõdetakse telje täiskaalu (100) vastu, mitte kaasa antud komponentide summa vastu.
+      Muidu <strong>parandaks komponendi ärajätmine kaetuse numbrit</strong> — mida vähem andmeid, seda terveni telg paistaks.</p>
+    </div>
+  </div>
+</section>
+
+<section id="ahel">
+  <div class="sh"><span class="sk">4</span><h2>Ahel — kust andmed tulevad ja kuhu lähevad</h2></div>
+  <p class="lead">Kõige olulisem piir kogu süsteemis: <strong>CoinGlass ulatub ainult Macini.</strong>
+  Ta on lokaalne MCP-server, mis jookseb seal masinas — pilves jooksev ajastatud töö ja telefon teda ei näe.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 400" role="img" aria-label="Andmeahel: Mac tõmbab CoinGlassist ja kirjutab Drive'i, pilv loeb Drive'ist ja avaldab lingi telefoni">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <text x="20" y="26" class="sv-band">SINU MAC</text>
+      <rect x="20" y="40" width="160" height="54" class="sv-box"/>
+      <text x="100" y="63" text-anchor="middle" class="sv-t">CoinGlass API</text>
+      <text x="100" y="79" text-anchor="middle" class="sv-m">coinglass-fq</text>
+
+      <rect x="250" y="40" width="160" height="54" class="sv-box"/>
+      <text x="330" y="63" text-anchor="middle" class="sv-t">vsi_fetch.py</text>
+      <text x="330" y="79" text-anchor="middle" class="sv-m">launchd, tunnis</text>
+
+      <rect x="480" y="40" width="170" height="54" class="sv-box"/>
+      <text x="565" y="63" text-anchor="middle" class="sv-t">vsi_input.json</text>
+      <text x="565" y="79" text-anchor="middle" class="sv-m">23 välja + allikad</text>
+
+      <line x1="180" y1="67" x2="244" y2="67" class="sv-line" marker-end="url(#ar)"/>
+      <text x="212" y="58" text-anchor="middle" class="sv-m">6 kutset</text>
+      <line x1="410" y1="67" x2="474" y2="67" class="sv-line" marker-end="url(#ar)"/>
+      <text x="442" y="58" text-anchor="middle" class="sv-m">kirjutab</text>
+
+      <line x1="0" y1="130" x2="820" y2="130" class="sv-div"/>
+      <text x="800" y="124" text-anchor="end" class="sv-m">siit edasi CoinGlass ei ulatu</text>
+
+      <rect x="300" y="160" width="220" height="58" class="sv-key"/>
+      <text x="410" y="184" text-anchor="middle" class="sv-t">Google Drive · TradeData</text>
+      <text x="410" y="200" text-anchor="middle" class="sv-m">ainus ühine punkt</text>
+      <line x1="565" y1="94" x2="500" y2="156" class="sv-line" marker-end="url(#ar)"/>
+      <text x="524" y="120" text-anchor="end" class="sv-m">peegeldus</text>
+
+      <text x="20" y="266" class="sv-band">PILV</text>
+      <rect x="20" y="282" width="180" height="54" class="sv-box"/>
+      <text x="110" y="305" text-anchor="middle" class="sv-t">päevaraport</text>
+      <text x="110" y="321" text-anchor="middle" class="sv-m">iga päev 13:00</text>
+
+      <rect x="270" y="282" width="160" height="54" class="sv-box"/>
+      <text x="350" y="305" text-anchor="middle" class="sv-t">run_vsi.py</text>
+      <text x="350" y="321" text-anchor="middle" class="sv-m">arvutab V ja S</text>
+
+      <rect x="500" y="282" width="170" height="54" class="sv-box"/>
+      <text x="585" y="305" text-anchor="middle" class="sv-t">link telefonis</text>
+      <text x="585" y="321" text-anchor="middle" class="sv-m">sama URL iga päev</text>
+
+      <line x1="330" y1="218" x2="150" y2="278" class="sv-line" marker-end="url(#ar)"/>
+      <text x="196" y="250" text-anchor="middle" class="sv-m">loeb</text>
+      <line x1="200" y1="309" x2="264" y2="309" class="sv-line" marker-end="url(#ar)"/>
+      <line x1="430" y1="309" x2="494" y2="309" class="sv-line" marker-end="url(#ar)"/>
+      <text x="462" y="300" text-anchor="middle" class="sv-m">avaldab</text>
+
+      <text x="410" y="374" text-anchor="middle" class="sv-m">invalideerimise sõnastab raport ise — failis on kohatäide</text>
+    </svg>
+    <figcaption>Mac on andmekoguja, pilv arvutab ja avaldab. Drive on ainus koht, kus need kaks kohtuvad —
+    ja seetõttu ainus lüli, mille katkemine peatab kogu ahela. Kui <code>vsi_fetch.py</code> ei saa kõiki
+    nõutud välju kätte, ta <strong>ei kirjuta midagi</strong>: eelmine terve fail jääb alles ja raport
+    ütleb selle vanuse välja.</figcaption>
+  </figure>
+
+  <h3>Mis jookseb kus</h3>
+  <div class="scroller"><table>
+    <thead><tr><th>Tükk</th><th>Kus</th><th>Millal</th></tr></thead>
+    <tbody>
+      <tr><td class="k">vsi_fetch.py</td><td class="n">Mac · launchd</td><td>iga tund, minutil 5</td></tr>
+      <tr><td class="k">market_data.py</td><td class="n">Mac · launchd</td><td>iga tund, minutil 0</td></tr>
+      <tr><td class="k">Päevaraport</td><td class="n">Pilv · Routine</td><td>iga päev 13:00</td></tr>
+      <tr><td class="k">vsi skill</td><td class="n">Konto</td><td>iga kord, kui küsid</td></tr>
+      <tr><td class="k">API võti</td><td class="n">~/.coinglass_key</td><td>chmod 600</td></tr>
+    </tbody>
+  </table></div>
+  <p>Võti on failis, mitte <code>export</code>-muutujas. launchd ei näe shelli keskkonda — eksporditud
+  võti oleks igal tunnisel käivitusel vaikselt puudunud.</p>
+</section>
+
+<section id="skanner">
+  <div class="sh"><span class="sk">5</span><h2>Skänner — kaks nimekirja</h2></div>
+  <p class="lead">Universum on <strong>reeglid, mitte nimekiri</strong>. Käsitsi valitud watchlist töötab
+  äärmuste otsija vastu: sa vaatad neid münte, mis sulle meelde tulid, mitte neid, kus midagi toimub.</p>
+
+  <div class="scroller"><table>
+    <thead><tr><th>Nimekiri</th><th>Tingimus</th><th>Mida otsib</th></tr></thead>
+    <tbody>
+      <tr><td class="k">ÄÄRMUSED</td><td class="n">|S| ≥ 60 · V vastassuunas · |V| ≥ 15</td><td>Rahvahulk on maksimaalselt ühel pool ja raha on hakanud teistpidi liikuma</td></tr>
+      <tr><td class="k">JÄTK</td><td class="n">|V| ≥ 30 · R sama märgiga · |S| &lt; 60</td><td>Liikumine käib ja rahvahulk pole veel peal</td></tr>
+    </tbody>
+  </table></div>
+
+  <p><strong>Äärmuse skoor on korrutis, mitte summa.</strong> Äärmus ilma pöördeta on null ja pööre ilma
+  äärmuseta on null. Kumbki üksi ei ole see, mida otsitakse — ja summa lubaks ühel teist asendada.</p>
+
+  <p>Kolmas telg <strong>R</strong> on suhteline tugevus BTC vastu, z-skoor <em>kandidaatide lõikes</em>,
+  mitte mündi oma ajaloo vastu. Rotatsioon on suhteline mäng: münt, mille V on +60 sellepärast, et kogu turg
+  tõuseb, ei ole leid — ta on beeta.</p>
+
+  <p>Universumi filtrid: OI ≥ 50M, maht ≥ 25M, vähemalt 3 börsil, BTC välja. Väljajäänud
+  <strong>loetletakse põhjendusega</strong> — vaikne kadumine nimekirjast loeks nagu „ei olnud huvitav",
+  mitte „ei mahtunud reeglitest läbi".</p>
+</section>
+
+<section id="kasutus">
+  <div class="sh"><span class="sk">6</span><h2>Kasutus</h2></div>
+
+  <h3>Ühe mündi lugemine — ükskõik kus, ka telefonis</h3>
+  <pre>jooksuta VSI HYPE peale</pre>
+  <p>Sõna „VSI" ei ole vaja. „Mis seis on SOL-il" käivitab sama. Skill tõmbab andmed, arvutab, avaldab
+  lehe ja annab lingi. Vastuseks tuleb <strong>üks selge seisukoht</strong> või aus „lugemist ei ole".</p>
+
+  <h3>Käsitsi, Macis</h3>
+  <pre>python3 vsi_fetch.py HYPE --invalideerimine "alla 79.40 h4 sulgemisel kaob" --peegelda
+python3 vsi.py --test        # 17 testiplokki
+python3 skanner.py --test    # 9 testiplokki</pre>
+
+  <h3>Kui midagi ei tööta</h3>
+  <ul>
+    <li><code>Upgrade plan</code> → CoinGlassi plaan või API võti. Toorpäring töötab, MCP mitte = serveril on vana võti.</li>
+    <li><code>No matching deferred tools found</code> → CoinGlassi ühendust ei ole selles sessioonis. Pilves ei olegi.</li>
+    <li><code>CERTIFICATE_VERIFY_FAILED</code> → <code>sudo "/Applications/Python 3.13/Install Certificates.command"</code></li>
+    <li>Raport ütleb „Maci tõmme ei ole jooksnud" → vaata <code>~/Library/Logs/vsifetch.log</code></li>
+  </ul>
+</section>
+
+<section id="vead">
+  <div class="sh"><span class="sk">7</span><h2>Vead, mis teel välja tulid</h2></div>
+  <p class="lead">Seitse päris viga koodis. Kolm leidsid testid, neli leidis päris kasutus.
+  Iga üks neist oleks andnud numbri, mis näeb terve välja.</p>
+
+  <div class="bug"><b>1 · MAD kollapseerus nulli</b>
+  Kui üle poole fundingu ajaloost on identne — mida börsid pidevalt teevad, hoides fundingut mitu perioodi
+  täpselt samal väärtusel — läks mediaanhälve nulli ja iga hälve luges z = 0.
+  <span class="cost">20-kordne funding-spike oleks lugenud „signaali pole".</span></div>
+
+  <div class="bug"><b>2 · Python ja veebileht andsid eri numbri</b>
+  Sama sisendiga V = +77.7 ühes ja +66 teises. Spot/ETF komponent oli lehel sees ka siis, kui andmeid polnud.
+  <span class="cost">Kaks eri vastust on hullem kui üks vale — sa ei tea, kumba uskuda.</span></div>
+
+  <div class="bug"><b>3 · BTC liigub BTC peale</b>
+  BTC enda peal jooksutades: „juhtiv muutuja on BTC — coin ei liigu oma andmete peale".
+  <span class="cost">Tautoloogia, mis näeb välja nagu hoiatus ja paneb kahtlema lugemises, millel viga pole.</span></div>
+
+  <div class="bug"><b>4 · Kaetuse põrandat ei olnud üldse</b>
+  41% kaetusega andis indikaator V = 100.0 ja täiesti kindla verdikti. Üks ellujäänud komponent haaras terve telje.
+  <span class="cost">Madal usaldusväärsuse protsent on kõrvalmärkus, mida keegi verdikti kõrval ei loe.</span></div>
+
+  <div class="bug"><b>5 · Vale venue luges kaetuse sisse</b>
+  Long/short skaleeriti Binance'i 11,2% OI-osakaaluga peaaegu nulli, aga tema 25 kaaluühikut lugesid edasi täiega.
+  Telg näitas 70% kaetust, seistes ainult fundingu peal.
+  <span class="cost">Leidis esimene päris jooks HYPE peal, mitte ükski test.</span></div>
+
+  <div class="bug"><b>6 · Puuduv komponent parandas kaetuse numbrit</b>
+  Kui komponent jäi sisendist hoopis välja, kadus ta ka nimetajast.
+  <span class="cost">Mida vähem andmeid, seda terveni telg paistis. Täpselt tagurpidi.</span></div>
+
+  <div class="bug"><b>7 · Basis oli kohustuslik, aga dokumentatsioon ütles vastupidist</b>
+  <code>run_vsi.py</code> nõudis basist, SKILL.md ütles „jäta välja, kui kvartalifutuuri pole".
+  <span class="cost">Müntide kohta, millel kvartalifutuuri ei ole, ei oleks tulnud kunagi ühtki lugemist.</span></div>
+
+  <p style="margin-top:26px">Lisaks üks viga, mis ei olnud koodis: päevaraporti juhises seisis
+  <code>Testi coinglass 1x. Ei tööta → jäta vahele, ei maini.</code> — käsk viga <em>peita</em>.
+  See on nüüd asendatud nõudega viga sõna-sõnalt tsiteerida.</p>
+</section>
+
+<section id="pole">
+  <div class="sh"><span class="sk">8</span><h2>Mis see ei ole</h2></div>
+  <ul>
+    <li><strong>Ei ole kauplemissignaal.</strong> Ostu- ja müügisoovitusi ega positsiooni suurust siin ei ole. Andmed, tasemed, invalideerimine — otsus on inimese oma.</li>
+    <li><strong>Ei ole ajastus.</strong> Äärmus võib püsida nädalaid. Funding ekstreemis ei tähenda, et pööre on homme.</li>
+    <li><strong>Ei ole täielik.</strong> Ettevaatav likvideerimiskaart on tasulise plaani taga ja tuleb ekraanipildina. Struktuur — Elliott, Wyckoff, tasemed — on eraldi kiht, mida vaadatakse enne indeksit, mitte selle sees.</li>
+    <li><strong>Ei ennusta.</strong> Ta ütleb, mida raha teeb ja kus rahvahulk on. Mida hind teeb, on eraldi küsimus.</li>
+  </ul>
+
+  <p style="margin-top:24px">Ja kõige tähtsam, mis on korratud igas failis, sest see on kogu asja mõte:</p>
+  <p class="lead" style="border-left:2px solid var(--pos); padding-left:18px; margin-top:14px">
+  „Mul pole andmeid" ilma endpointi kutsumata on <strong>vale väide</strong>, mitte ettevaatlikkus.
+  Ja number, mille allikat ei oska nimetada, ei kuulu väljundisse.</p>
+</section>
+
+<footer>
+  <p>26 testiplokki · 7 parandatud viga · kood harul <code>claude/rahastugude-parsused-l687b7</code></p>
+  <p style="margin-top:8px">Seotud: <strong>Turu seaduspärasuste koond</strong> (mustrite alustabel) ja
+  <strong>Voog–Surve kaart</strong> (interaktiivne tööriist).</p>
+</footer>
+
+</div>
