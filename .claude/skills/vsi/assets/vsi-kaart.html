@@ -364,9 +364,11 @@
        d: bz.ok ? `annualiseeritud ${num('bnow').toFixed(1)}%, z = ${bz.z>=0?"+":""}${bz.z.toFixed(1)}`
                 : `ajalugu on liiga lühike (${bh.length} vaatlust, vaja ≥ 8) — komponent maas`,
        src:"kvartalifutuur vs spot"},
-      {n:"Long/short", w:25, s:lsRaw*share, on:ls>0,
+      // vale venue ei ole nõrk andmepunkt, ta ei ole andmepunkt — muidu loeks
+      // 25 kaaluühikut kaetuse sisse ja annaks 0.5 signaali
+      {n:"Long/short", w:25, s: share < 0.25 ? 0 : lsRaw*share, on: ls>0 && share >= 0.25,
        d: share < 0.25
-          ? `ratio ${ls.toFixed(2)}, aga börs katab vaid ${Math.round(share*100)}% OI-st — EI ole rahvahulk, kaal alla surutud`
+          ? `ratio ${ls.toFixed(2)}, aga börs katab vaid ${Math.round(share*100)}% OI-st — EI ole rahvahulk, komponent maas. Võta ratio domineerivalt börsilt`
           : `ratio ${ls.toFixed(2)} börsil, mis katab ${Math.round(share*100)}% OI-st`,
        src:"long_short action=global + oi_distribution"},
     ];

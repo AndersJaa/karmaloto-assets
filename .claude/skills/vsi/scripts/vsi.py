@@ -204,10 +204,15 @@ def long_short_kalle(ratio: float, borsi_oi_osakaal: float) -> Komponent:
         return Komponent("Long/short", 0.0, 25, "vigane ratio", "long_short action=global", kehtiv=False)
     toores = squash(math.log(ratio) / 0.35)
     if borsi_oi_osakaal < 0.25:
+        # Varem skaleeriti siin skoor peaaegu nulli, aga kaal luges kaetuse
+        # arvestuses edasi täiega — 25 kaaluühikut, mis annab 0.5 signaali.
+        # Nii näitas telg "70% kaetud" ka siis, kui ta seisis ühe komponendi
+        # peal. Vale venue ei ole nõrk andmepunkt, ta ei ole andmepunkt.
         return Komponent(
-            "Long/short", toores * borsi_oi_osakaal, 25,
-            f"ratio {ratio:.2f}, aga börs katab vaid {borsi_oi_osakaal:.0%} OI-st — EI ole rahvahulk, kaal alla surutud",
-            "long_short action=global + oi_distribution",
+            "Long/short", 0.0, 25,
+            f"ratio {ratio:.2f}, aga börs katab vaid {borsi_oi_osakaal:.0%} OI-st — "
+            "EI ole rahvahulk, komponent maas. Võta ratio domineerivalt börsilt",
+            "long_short action=global + oi_distribution", kehtiv=False,
         )
     return Komponent(
         "Long/short", toores * borsi_oi_osakaal, 25,
@@ -548,10 +553,20 @@ def _test() -> None:
     assert abs(kate - 0.5) < 1e-9, "kate peab näitama, et pool kaalust on maas"
     ok += 1
 
-    # väikese OI-osakaaluga börsi ratio surutakse alla
+    # väikese OI-osakaaluga börsi ratio lülitub välja, mitte ei skaleeru nulli lähedale
     suur = long_short_kalle(2.5, 0.90)
     vaike = long_short_kalle(2.5, 0.10)
-    assert abs(vaike.skoor) < abs(suur.skoor) / 5, "vähese katvusega börs ei tohi telge liigutada"
+    assert suur.kehtiv and abs(suur.skoor) > 0.5
+    assert not vaike.kehtiv and vaike.skoor == 0.0, "vale venue ei ole nõrk andmepunkt, ta ei ole andmepunkt"
+
+    # ja see peab kaetuse arvestuses näha olema: S ühe komponendi peal ei anna lugemist
+    s_telg = [funding_surve(0.0004, [0.0001] * 6 + [0.00012, 0.00008, 0.00011, 0.00009]),
+              long_short_kalle(1.07, 0.112),
+              Komponent("Basis", 0.0, 30, "ajalugu puudub", "", kehtiv=False)]
+    lug = arvuta("X", [Komponent("v", 0.9, 100, "", "")], s_telg,
+                 Varavad(), 0.5, invalideerimine="t")
+    assert lug.surve_kate < 0.50, f"S peab näitama alla poole kaetust, sai {lug.surve_kate:.0%}"
+    assert lug.kvadrant()[0] == "LUGEMIST EI OLE", "ühe komponendi peal seisev telg ei anna lugemist"
     ok += 1
 
     # MAD-z ei lähe üksikust ekstreemist katki

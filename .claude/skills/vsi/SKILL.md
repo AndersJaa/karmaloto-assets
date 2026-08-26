@@ -51,8 +51,8 @@ Null näeb välja nagu andmed ja annab lugemise, mis on vaikselt vale.
 | `spot_voog_usd` | päevased netovood — **ainult BTC/ETH, mujal jäta välja** | USD |
 | `funding_nyyd_pct`, `funding_ajalugu_pct` | `funding_history action=oi_weighted`, ≥ 8 punkti | % |
 | `basis_nyyd_pct`, `basis_ajalugu_pct` | kvartalifutuur vs spot, ≥ 8 punkti | % |
-| `long_short_ratio` | `long_short action=global` | suhtarv |
-| `borsi_oi_osakaal` | `oi_distribution by_exchange`, selle börsi osa | 0…1 |
+| `long_short_ratio` | `long_short action=global` — **domineerivalt börsilt, mitte vaikimisi Binance'ilt** | suhtarv |
+| `borsi_oi_osakaal` | `oi_distribution by_exchange`, selle **sama** börsi osa | 0…1 |
 | `andmete_vanus_h` | vanim kasutatud andmepunkt | tundi |
 | `kaetud_oi_osakaal` | kui suurt osa OI-st andmed katavad | 0…1 |
 | `btc_korrelatsioon` | coin vs BTC samas aknas | −1…1 |
@@ -145,8 +145,10 @@ Neid ei pea käsitsi jälgima — skript teeb ja kirjutab välja:
 
 - **Likvideerimised alla 0.5% OI-st** lülituvad välja kui müra ja nende kaal
   jaotub teiste komponentide vahel ümber. 90/10 jaotus 0.1% pealt ei ole kaskaad.
-- **Long/short skaleeritakse börsi OI-osakaaluga.** Alla ~25% katvusega börsi
-  ratio ei ole rahvahulk.
+- **Long/short lülitub välja, kui börs katab alla ~25% OI-st.** Vale venue ei ole
+  nõrk andmepunkt — ta ei ole andmepunkt. HYPE puhul tähendab see Hyperliquidi
+  (56,9% OI-st), mitte Binance'i (11,2%): Binance'ilt võetud ratio jätab S-telje
+  ainuüksi fundingu peale ja siis lugemist ei tule.
 - **Külgsuunaline režiim** (ADX < 20 VÕI Chop > 61.8) tõstab voo läve 25-lt 40-le,
   sest seal on valemurd reegel, mitte erand.
 - **BTC korrelatsioon ≥ 0.80** paneb lipu, et juhtiv muutuja on BTC, mitte münt ise.
