@@ -148,6 +148,23 @@ reeglitega ja uueneb ise:
 Väljajäänud **loetletakse põhjendusega**. Vaikne kadumine nimekirjast loeks nagu
 „ei olnud huvitav", mitte „ei mahtunud reeglitest läbi".
 
+#### Kust universumi andmed tulevad
+
+| Väli | Allikas | Miks just see |
+|---|---|---|
+| Kandidaatide nimekiri, turukapp, maht | CoinGecko `get-coin-markets` | top-N ühe kutsega, ilma käsitsi nimekirjata |
+| Tickeri lahendamine id-ks | CoinGecko `search-coins` | enne teisi kutseid, kui sümbol on mitmetähenduslik |
+| Projekti taust, kategooriad | CoinGecko `get-coin-info` | konteksti jaoks, mitte filtrina |
+| **Börside arv** | CoinGlass `oi_distribution by_exchange` | **mitte CoinGeckost** — loe read, kus OI > 0 |
+| OI, funding, taker, likvideerimised | CoinGlass | sama mis VSI-l |
+
+Börside arv tuleb CoinGlassist, mitte CoinGeckost, kahel põhjusel: CoinGecko
+tööriistad seda välja ei anna, ja meile loeb **tuletisinstrumentide** kohalolek,
+mitte spot-noteeringute arv. Münt, mis on kümnel spot-börsil ja ühel perp-börsil,
+ei anna positsioneerimise lugemist.
+
+`get-top-gainers-losers` nõuab Pro-võtit — sellele ei toetu.
+
 ### Kaks nimekirja, kaks eri küsimust
 
 **ÄÄRMUSED** — `|S| ≥ 60` **ja** voog liigub surve vastu **ja** `|V| ≥ 15`
