@@ -5,7 +5,7 @@ Liitindikaator, mis koondab **ainult mehaaniliselt mõõdetavad** näitajad
 
 ```
 python3 vsi.py --demo     # näidislugemine väljamõeldud arvudega
-python3 vsi.py --test     # 12 testiplokki
+python3 vsi.py --test     # 14 testiplokki
 ```
 
 ## Miks Elliott siin ei ole
@@ -120,3 +120,39 @@ Sama V = +27 annab trendis lugemise ja külgsuunas mitte. Test kontrollib täpse
 **Volatiliteet (ATR pertsentiil)** on sellest sõltumatu: kokkusurutud ATR ütleb, et
 liikumine **tuleb**, mitte kuhu. Külgsuunaline turg võib olla nii kokku surutud kui
 laienenud, ja need kaks tähendavad täiesti eri asja — sellepärast neid ei liideta.
+
+
+## Skänner — coini otsimine
+
+```bash
+python3 skanner.py --demo
+python3 skanner.py --test
+```
+
+`skanner.py` vastab teisele küsimusele kui VSI. VSI ütleb, mis toimub **selle**
+mündiga; skänner ütleb, **millisesse minna**. Kaks asja on seetõttu teisiti:
+
+**Kolmas telg — suhteline tugevus (R).** Rotatsioon müntide vahel on suhtelise
+tugevuse mäng. Münt, mille V on +60 sellepärast, et kogu turg tõuseb, ei ole
+leid — ta on beeta. R on z-skoor **kandidaatide lõikes**, mitte mündi oma ajaloo
+vastu: küsimus pole "kas ta on tugevam kui eelmisel nädalal", vaid "kas ta on
+tugevam kui teised praegu".
+
+**Nädalased parameetrid.** `HINNA_REF` 12% ja `OI_REF` 15% VSI 3% / 5% asemel.
+Päevase akna refidega annaks nädalane müra igale mündile täisskoori.
+
+Kaks asja, mis skännil ise ära tehakse:
+
+- **Likviidsuse põrand** (OI ≥ 50M, maht ≥ 25M) viskab mündi nimekirjast **välja**,
+  mitte ei anna madalat skoori. Suurus, mida ei saa mõistliku slippage'iga sisse
+  ega välja, pole kandidaat, ükskõik kui ilus number tal on.
+- **„Tugevus tuleb BTC nõrkusest"** lipp. Langevas turus on iga vähem langenud
+  münt positiivse ülejäägiga. Ilma selle liputa loeks skänner iga kukkumises
+  vastupidava mündi leiuks.
+
+Surve on skoori juures **karistus mõlemas suunas** — kui rahvahulk on vooga samas
+suunas ülerahvastatud, on hea osa liikumisest juba tehtud.
+
+Pingerida on **vaatamise järjekord, mitte soovitus.** Kolm telge on real eraldi
+näha ja skoor neid ei asenda — iga rea kohta tuleb enne otsust jooksutada täis-VSI
+koos invalideerimisega.
