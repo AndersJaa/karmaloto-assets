@@ -63,6 +63,12 @@ Null näeb välja nagu andmed ja annab lugemise, mis on vaikselt vale.
 
 Protsendid protsentidena: `4.2` tähendab 4.2%, mitte 0.042. Skript teisendab ise.
 
+**Ükski münt pole eelistatud — `coin` ütleb, mida hinnatakse.** Kaks erisust:
+BTC ja ETH puhul lisa `spot_voog_usd` (ETF- ja spot-vood on ainult neil kahel);
+mujal jäta see väli välja ja kaal jaotub teiste komponentide vahel ümber.
+BTC enda peal ei ole `btc_korrelatsioon` nõutud — korrelatsioon iseendaga on 1.0
+ja ütleks lugemises tautoloogia, et BTC liigub BTC peale.
+
 ### 3. Jooksuta
 
 ```bash

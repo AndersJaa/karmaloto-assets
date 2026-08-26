@@ -117,7 +117,11 @@ def skanni(kandidaadid: list[Kandidaat], btc_tootlus: float,
     valja = []
     sobivad = []
     for k in kandidaadid:
-        if k.oi_usd < min_oi_usd:
+        if k.coin.strip().upper() in vsi.BTC_NIMED:
+            # BTC ülejääk iseenda vastu on alati null — ta ei saa kunagi
+            # pingereas tõusta ega langeda, ainult teisi lahjendada
+            valja.append(f"{k.coin}: võrdlusalus, mitte kandidaat")
+        elif k.oi_usd < min_oi_usd:
             valja.append(f"{k.coin}: OI {k.oi_usd/1e6:.0f}M alla {min_oi_usd/1e6:.0f}M põranda")
         elif k.maht_usd < min_maht_usd:
             valja.append(f"{k.coin}: maht {k.maht_usd/1e6:.0f}M alla {min_maht_usd/1e6:.0f}M põranda")
@@ -245,13 +249,20 @@ def _test() -> None:
     assert z[-1] > 2 and abs(z[1]) < 1, "väljapaistev peab eristuma, keskmine mitte"
     ok += 1
 
+    # BTC ei osale kandidaadina
+    read, valja = skanni([teeb("BTC", 0.10, 0.10), teeb("A", 0.20, 0.20),
+                          teeb("B", 0.05, 0.05), teeb("C", 0.02, 0.02)], 0.10)
+    assert "BTC" not in [r.coin for r in read], "BTC ei tohi pingereas olla"
+    assert any("võrdlusalus" in x for x in valja), "ja väljajäämine peab olema põhjendatud"
+    ok += 1
+
     # tühi ja liiga lühike nimekiri ei kuku kokku
     assert skanni([], 0.0) == ([], [])
     read, _ = skanni([teeb("ONE", 0.1, 0.1)], 0.02)
     assert len(read) == 1 and read[0].suhteline == 0.0, "alla 3 kandidaadi z = 0"
     ok += 1
 
-    print(f"{ok}/7 testiplokki OK")
+    print(f"{ok}/8 testiplokki OK")
 
 
 if __name__ == "__main__":

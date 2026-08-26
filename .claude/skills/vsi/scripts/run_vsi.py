@@ -39,7 +39,11 @@ KOHUSTUSLIK = [
 
 
 def kontrolli(d: dict) -> None:
-    puudu = [k for k in KOHUSTUSLIK if k not in d]
+    noutud = list(KOHUSTUSLIK)
+    if str(d.get("coin", "")).strip().upper() in vsi.BTC_NIMED:
+        # BTC korrelatsioon iseendaga on 1.0 ega ütle midagi — ei nõua seda
+        noutud.remove("btc_korrelatsioon")
+    puudu = [k for k in noutud if k not in d]
     if puudu:
         raise SystemExit(
             "Puuduvad väljad: " + ", ".join(puudu) +
@@ -78,7 +82,7 @@ def ehita(d: dict) -> vsi.Lugemine:
     varavad = vsi.Varavad(
         andmete_vanus_h=d["andmete_vanus_h"],
         kaetud_oi_osakaal=d["kaetud_oi_osakaal"],
-        btc_korrelatsioon=d["btc_korrelatsioon"],
+        btc_korrelatsioon=d.get("btc_korrelatsioon", 0.0),
     )
     return vsi.arvuta(d["coin"], v, s, varavad,
                       atr_pertsentiil=d["atr_pertsentiil"],
@@ -107,7 +111,7 @@ def preset(d: dict) -> dict:
             "share": round(d["borsi_oi_osakaal"] * 100, 1),
             "age": d["andmete_vanus_h"],
             "cov": round(d["kaetud_oi_osakaal"] * 100, 1),
-            "btc": d["btc_korrelatsioon"],
+            "btc": d.get("btc_korrelatsioon", 0.0),
             "atr": d["atr_pertsentiil"],
             "adx": d["adx"], "chop": d["chop"],
             "ema": "1" if d["hind_ule_ema200"] else "0",

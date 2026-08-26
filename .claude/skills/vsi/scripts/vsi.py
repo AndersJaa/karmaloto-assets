@@ -326,6 +326,9 @@ def volatiliteedi_reziim(atr_pertsentiil: float) -> tuple[str, str]:
     return "normaalne", "ajastuse eelist ei ole"
 
 
+BTC_NIMED = {"BTC", "XBT", "BTCUSD", "BTCUSDT"}
+
+
 @dataclass
 class Varavad:
     """Kõik väärtused 0..1. Korrutuvad usaldusväärsuseks."""
@@ -333,6 +336,7 @@ class Varavad:
     max_vanus_h: float = 3.0
     kaetud_oi_osakaal: float = 1.0     # kui suurt osa OI-st andmed katavad
     btc_korrelatsioon: float = 0.0     # |corr| coini ja BTC vahel samas aknas
+    on_btc: bool = False               # lugemine käib BTC enda kohta
 
     def varskus(self) -> float:
         if self.andmete_vanus_h <= self.max_vanus_h:
@@ -340,6 +344,14 @@ class Varavad:
         return clip(self.max_vanus_h / self.andmete_vanus_h, 0.0, 1.0)
 
     def juhtiv_muutuja(self) -> str:
+        """BTC enda peal on korrelatsioon iseendaga 1.0 ja ei tähenda midagi.
+
+        Ilma selle erandita ütleks lugemine BTC kohta "juhtiv muutuja on BTC,
+        coin ei liigu oma andmete peale" — tautoloogia, mis näeb välja nagu
+        hoiatus ja paneb kahtlema lugemises, millel viga pole.
+        """
+        if self.on_btc:
+            return "BTC ise — ta ongi turu juht"
         return "BTC" if abs(self.btc_korrelatsioon) >= 0.80 else "coin ise"
 
     def hoiatused(self) -> list[str]:
@@ -348,7 +360,7 @@ class Varavad:
             h.append(f"andmed on {self.andmete_vanus_h:.1f}h vanad (lubatud {self.max_vanus_h:.0f}h)")
         if self.kaetud_oi_osakaal < 0.60:
             h.append(f"andmed katavad ainult {self.kaetud_oi_osakaal:.0%} OI-st")
-        if abs(self.btc_korrelatsioon) >= 0.80:
+        if not self.on_btc and abs(self.btc_korrelatsioon) >= 0.80:
             h.append(f"BTC korrelatsioon {self.btc_korrelatsioon:+.2f} — coin ei liigu oma andmete peale")
         return h
 
@@ -450,6 +462,7 @@ def arvuta(coin: str, v_komponendid: list[Komponent], s_komponendid: list[Kompon
            invalideerimine: str | None = None) -> Lugemine:
     voog, v_kate = _telg(v_komponendid)
     surve, s_kate = _telg(s_komponendid)
+    varavad.on_btc = coin.strip().upper() in BTC_NIMED
     return Lugemine(coin, voog, surve, v_kate, s_kate, varavad,
                     volatiliteedi_reziim(atr_pertsentiil),
                     treni_reziim(adx_vaartus, chop_vaartus, hind_ule_ema200),
@@ -560,6 +573,21 @@ def _test() -> None:
         pass
     ok += 1
 
+    # BTC enda peal ei ole korrelatsioon iseendaga näitaja
+    v_btc = [Komponent("a", 0.9, 100, "", "")]
+    s_btc = [Komponent("b", 0.5, 100, "", "")]
+    btc = arvuta("BTC", v_btc, s_btc, Varavad(btc_korrelatsioon=1.0), 0.5,
+                 invalideerimine="t")
+    alt = arvuta("SOL", v_btc, s_btc, Varavad(btc_korrelatsioon=1.0), 0.5,
+                 invalideerimine="t")
+    assert "BTC ise" in btc.varavad.juhtiv_muutuja()
+    assert not any("korrelatsioon" in x for x in btc.varavad.hoiatused()), \
+        "BTC ei tohi saada hoiatust, et ta liigub BTC peale"
+    assert alt.varavad.juhtiv_muutuja() == "BTC"
+    assert any("korrelatsioon" in x for x in alt.varavad.hoiatused()), \
+        "alt PEAB selle hoiatuse saama"
+    ok += 1
+
     # vananenud andmed langetavad usaldusväärsust
     varske = Varavad(andmete_vanus_h=1.0)
     vana = Varavad(andmete_vanus_h=12.0)
@@ -612,7 +640,7 @@ def _test() -> None:
     assert kokku.reziim[0] == "kokku surutud" and lai.reziim[0] == "laienenud"
     ok += 1
 
-    print(f"{ok}/14 testiplokki OK")
+    print(f"{ok}/15 testiplokki OK")
 
 
 if __name__ == "__main__":
