@@ -6,7 +6,7 @@
 
 27.08.2026 andsid kolm süsteemi sama mündi kohta sama ajaga kolm eri vastust:
 
-| Näitaja | Päevaraport 13:18 | Hype Positsioon 17:00 | CoinGlass 20:15 |
+| Näitaja | Päevaraport 13:18 | Positsioonileht 17:00 | CoinGlass 20:15 |
 |---|---|---|---|
 | Funding | positiivne | **−0,1466%/päev** | — |
 | Vaalad | **7/7 short** | **6 positsiooni, 5/1** | long 4,57B / short 5,22B |
@@ -14,6 +14,18 @@
 
 Ükski neist ei olnud vale. Nad olid **eri asjad sama nime all** — eri aken, eri
 börs, eri ühik. Selle lepingu ainus ülesanne on see võimatuks teha.
+
+Iga rea täpne põhjus, sest need on õpetlikud:
+
+- **Funding.** Märki ei pööranud keegi. Hyperliquidi **tunnine** funding vahetab
+  päeva jooksul korduvalt märki — CoinGlassi h8 küünal andis samas aknas
+  `high +0,00845` ja `low −0,011274`. Kui üks tunnine tikk korrutada 24-ga ja
+  nimetada „%/päevas", tulebki kell 13 pluss ja kell 17 miinus.
+  **Viga ei ole märgis, vaid selles, et üksikut tikki esitatakse päevamäärana.**
+- **Vaalad.** Iga tunnine jooks teeb **uue elava leaderboard-skanni**. Positsioonide
+  arv muutub tunnist tundi. Ilma skanni ajatempliga kõrvuti on „7/7" ja „6, 5/1"
+  näiliselt vastuolus, tegelikult kaks eri hetke.
+- **Long/short.** Kaks eri börsi, kaks eri arvu, mõlemad õiged oma börsi kohta.
 
 ## Kolm reeglit, millest kõik muu tuleneb
 
@@ -76,9 +88,9 @@ Kui mõni allikas on vanem kui `ajatempel`, on selle välja kõrval oma
 
 | Väli | Ühik | Allikas |
 |---|---|---|
-| `funding_pct` | **% / 8h**, oi_weighted | Üks ühik. Kuvamisel võib teisendada |
+| `funding_pct` | **% / 8h**, oi_weighted | Üks ühik. Kuvamisel võib teisendada. **Üksikut tunnist tikki ei korrutata 24-ga ega nimetata päevamääraks** — tunnine funding vahetab märki mitu korda päevas |
 | `funding_ajalugu_pct` | sama ühik, ≥ 8 punkti | Vajalik mediaan/MAD jaoks |
-| `basis_pct` | % annualiseeritud | Puudub, kui kvartalifutuuri pole |
+| `basis_pct` | **toores %**, nagu CoinGlass `close_basis` annab | Puudub, kui kvartalifutuuri pole. **Ei annualiseerita** — see nõuaks aegumiseni jäänud päevi, mida vastuses ei ole, ja oletatud tenor tekitaks väljamõeldud täpsust. z-skoor on skaalast sõltumatu, nii et VSI-le see vahet ei tee |
 | `basis_ajalugu_pct` | sama, ≥ 8 punkti | |
 | `long_short_ratio` | suhtarv | **Domineerivalt börsilt.** Kui see börs ei anna, väli **puudub** — Binance'i 11% ei esitata rahvahulgana |
 | `long_short_bors` | tekst | Mis börsilt ratio tuli |
@@ -108,6 +120,8 @@ Need on lugemiseks ja kuvamiseks, mitte indeksi sisendiks.
 | `likvideerimiskaart.baashind` | Mis hinnaga kaart arvutati |
 | `likvideerimiskaart.nihe_pct` | Praegune hind vs baashind. Üle 2% → märgi |
 | `btc.hind`, `btc.muutus_24h_pct` | |
+| `hl_funding_1h_pct` | Hyperliquidi **tunnine** määr — mida Anders oma venue'il päriselt maksab. Oma nime all, mitte `funding_pct` asemel |
+| `hl_funding_keskmine_pct` | 48 punkti keskmine (`oi_trend.funding_avg`). **Kuvamisel eelistatakse seda üksikule tikile** |
 
 **Vaalade arv tuleb ainult siit.** Kui leht näitab „6 positsiooni" ja raport
 „7/7", siis üks neist ei lugenud failist.
@@ -124,6 +138,13 @@ Need **kaks katet on eraldi meelega**. Varem läks taker-börside osakaal
 üldiseks kordajaks ja surus HYPE usaldusväärsuse struktuurselt 17% juurde —
 kuigi funding, basis ja likvideerimised olid täies katvuses. Taker-kate
 puudutab taker-komponenti, mitte tervet lugemist.
+
+## Mida siin meelega EI ole
+
+**`invalideerimine`.** See ei ole mõõtmine, vaid otsus — täpne hind või tingimus,
+mis lugemise valeks tunnistab. Mõõtmiste faili ta ei kuulu: masin ei sõnasta
+invalideerimist ja kohatäide failis muutub varem või hiljem päris lugemiseks.
+`run_vsi.py` võtab ta eraldi lipuga ja keeldub ilma selleta töötamast.
 
 ## Mis loeb faili, mis mitte
 
