@@ -240,7 +240,7 @@ def basis_surve(basis_nyyd: float, basis_ajalugu: list[float]) -> Komponent:
     z = robust_z(basis_nyyd, basis_ajalugu)
     return Komponent(
         "Basis", squash(z), 30,
-        f"annualiseeritud {basis_nyyd:+.1%}, z = {z:+.1f}",
+        f"{basis_nyyd:+.2%} (toores, mitte annualiseeritud), z = {z:+.1f}",
         "kvartalifutuur vs spot",
     )
 

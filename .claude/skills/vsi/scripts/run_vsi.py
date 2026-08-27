@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -31,22 +32,103 @@ import vsi  # noqa: E402
 # Nende nõudmine tähendaks, et selliste müntide kohta ei tule lugemist kunagi.
 # Nende puudumine on juba kaetud: kaal jaotub ümber ja kaetuse põrand otsustab,
 # kas telge saab veel lugeda.
+# Väljad, milleta lugemist ei tule. Basis, spot/ETF voog ja long/short EI ole
+# siin: kummalgi on mündid, kus neid lihtsalt ei eksisteeri (HYPE-l pole
+# Hyperliquidi ratiot ega ETF-voogu). Nende puudumine on juba kaetud — kaal
+# jaotub ümber ja kaetuse põrand otsustab, kas telge saab veel lugeda.
 KOHUSTUSLIK = [
     "coin", "hinna_muutus_pct", "oi_muutus_pct", "neto_taker_usd", "maht_usd",
     "long_liq_usd", "short_liq_usd", "oi_usd",
     "funding_nyyd_pct", "funding_ajalugu_pct",
-    "long_short_ratio", "borsi_oi_osakaal",
-    "andmete_vanus_h", "kaetud_oi_osakaal", "btc_korrelatsioon",
+    "andmete_vanus_h", "kaetud_oi_osakaal",
     "atr_pertsentiil", "adx", "chop", "hind_ule_ema200",
     "invalideerimine",
 ]
+
+# turg.json plokk.väli  ->  siseselt kasutatav lame nimi.
+# Andmeleping hoiab välju plokkides; see moodul on kirjutatud lamedale kujule.
+# Tõlge käib ühes kohas, et kummalgi poolel ei peaks teist meeles pidama.
+LEPINGU_TEED = {
+    "meta.coin": "coin",
+    "meta.ajatempel": "ajatempel",
+    "hind.muutus_aknas_pct": "hinna_muutus_pct",
+    "voog.oi_muutus_pct": "oi_muutus_pct",
+    "voog.neto_taker_usd": "neto_taker_usd",
+    "voog.maht_usd": "maht_usd",
+    "voog.long_liq_usd": "long_liq_usd",
+    "voog.short_liq_usd": "short_liq_usd",
+    "voog.oi_usd": "oi_usd",
+    "voog.spot_voog_usd": "spot_voog_usd",
+    "surve.funding_pct": "funding_nyyd_pct",
+    "surve.funding_ajalugu_pct": "funding_ajalugu_pct",
+    "surve.basis_pct": "basis_nyyd_pct",
+    "surve.basis_ajalugu_pct": "basis_ajalugu_pct",
+    "surve.long_short_ratio": "long_short_ratio",
+    "surve.long_short_bors_kate": "borsi_oi_osakaal",
+    "reziim.btc_korrelatsioon": "btc_korrelatsioon",
+    "reziim.atr_pertsentiil": "atr_pertsentiil",
+    "reziim.adx": "adx",
+    "reziim.chop": "chop",
+    "reziim.hind_ule_ema200": "hind_ule_ema200",
+    # kaetus tuleb AGREGEERITUD katvusest, mitte taker-börside omast:
+    # taker-piirang puudutab taker-komponenti, mitte tervet lugemist
+    "kate.agregeeritud_kate": "kaetud_oi_osakaal",
+}
+
+
+def _vota(d: dict, tee: str):
+    """Loeb 'plokk.väli' tee. Tagastab None, kui teed ei ole."""
+    osa = d
+    for samm in tee.split("."):
+        if not isinstance(osa, dict) or samm not in osa:
+            return None
+        osa = osa[samm]
+    return osa
+
+
+def lepingust(d: dict) -> dict:
+    """turg.json (plokkidega) -> lame kuju. Juba lame sisend läheb läbi muutmata.
+
+    Vanuse arvutab ajatemplist ise: andmete_vanus_h ei ole lepingus väli, vaid
+    tuletis, ja tuletist ei salvestata kaks korda.
+    """
+    if "meta" not in d:
+        return d  # vana lame kuju, nt käsitsi kokku pandud JSON
+
+    lame = {}
+    for tee, nimi in LEPINGU_TEED.items():
+        v = _vota(d, tee)
+        if v is not None:
+            lame[nimi] = v
+
+    stamp = lame.pop("ajatempel", None)
+    if stamp:
+        try:
+            t = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+            if t.tzinfo is None:
+                t = t.replace(tzinfo=timezone.utc)
+            vanus = (datetime.now(timezone.utc) - t).total_seconds() / 3600
+            if vanus < -0.5:
+                raise SystemExit(
+                    f"meta.ajatempel on tulevikus ({stamp}) — vanus tuleks {vanus:.1f}h.\n"
+                    "Tõenäoliselt on kirjutatud kohalik aeg UTC sildiga. Vanusevärav ei "
+                    "saa niimoodi tööle hakata, seega lugemist ei anta."
+                )
+            lame["andmete_vanus_h"] = round(max(vanus, 0.0), 2)
+        except ValueError:
+            raise SystemExit(f"meta.ajatempel ei ole loetav kuupäev: {stamp}")
+
+    lame["kontekst"] = d.get("kontekst", {})
+    lame["kate"] = d.get("kate", {})
+    lame["hind"] = d.get("hind", {})
+    return lame
 
 
 def kontrolli(d: dict) -> None:
     noutud = list(KOHUSTUSLIK)
     if str(d.get("coin", "")).strip().upper() in vsi.BTC_NIMED:
         # BTC korrelatsioon iseendaga on 1.0 ega ütle midagi — ei nõua seda
-        noutud.remove("btc_korrelatsioon")
+        noutud = [x for x in noutud if x != "btc_korrelatsioon"]
     puudu = [k for k in noutud if k not in d]
     if puudu:
         raise SystemExit(
@@ -84,13 +166,15 @@ def ehita(d: dict) -> vsi.Lugemine:
     s = [
         vsi.funding_surve(d["funding_nyyd_pct"] / 100,
                           [x / 100 for x in d["funding_ajalugu_pct"]]),
-        vsi.long_short_kalle(d["long_short_ratio"], d["borsi_oi_osakaal"]),
     ]
-    # basis puudub mündil, millel kvartalifutuuri ei ole — kaal jaotub ümber ja
-    # kaetuse põrand ütleb, kas S-telge saab veel lugeda
+    # long/short puudub, kui domineeriv börs ratiot ei anna — alumisele ei astuta
+    if "long_short_ratio" in d and "borsi_oi_osakaal" in d:
+        s.append(vsi.long_short_kalle(d["long_short_ratio"], d["borsi_oi_osakaal"]))
+    # basis puudub mündil, millel kvartalifutuuri ei ole
     if "basis_nyyd_pct" in d and d.get("basis_ajalugu_pct"):
         s.append(vsi.basis_surve(d["basis_nyyd_pct"] / 100,
                                  [x / 100 for x in d["basis_ajalugu_pct"]]))
+
     varavad = vsi.Varavad(
         andmete_vanus_h=d["andmete_vanus_h"],
         kaetud_oi_osakaal=d["kaetud_oi_osakaal"],
@@ -119,8 +203,9 @@ def preset(d: dict) -> dict:
             "fhist": " ".join(str(x) for x in d["funding_ajalugu_pct"]),
             "bnow": d.get("basis_nyyd_pct", ""),
             "bhist": " ".join(str(x) for x in d.get("basis_ajalugu_pct", [])),
-            "ls": d["long_short_ratio"],
-            "share": round(d["borsi_oi_osakaal"] * 100, 1),
+            # tühjaks jäetud väli tähendab lehel "ei kohaldu", mitte nulli
+            "ls": d.get("long_short_ratio", ""),
+            "share": round(d["borsi_oi_osakaal"] * 100, 1) if "borsi_oi_osakaal" in d else "",
             "age": d["andmete_vanus_h"],
             "cov": round(d["kaetud_oi_osakaal"] * 100, 1),
             "btc": d.get("btc_korrelatsioon", 0.0),
@@ -136,9 +221,15 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="VSI lugemine JSON-sisendist")
     ap.add_argument("sisend", help="JSON toornumbritega")
     ap.add_argument("--valja", default="vsi-lugemine.html", help="väljundleht")
+    ap.add_argument("--invalideerimine", default=None,
+                    help="täpne hind või tingimus, mis lugemise valeks tunnistab. "
+                         "Andmefailis seda välja EI OLE ja see on meelega: "
+                         "invalideerimine on otsus, mitte mõõtmine.")
     args = ap.parse_args()
 
-    d = json.loads(Path(args.sisend).read_text(encoding="utf-8"))
+    d = lepingust(json.loads(Path(args.sisend).read_text(encoding="utf-8")))
+    if args.invalideerimine:
+        d["invalideerimine"] = args.invalideerimine
     kontrolli(d)
     lugemine = ehita(d)
     print(lugemine.render())
