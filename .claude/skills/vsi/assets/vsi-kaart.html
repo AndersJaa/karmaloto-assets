@@ -182,9 +182,9 @@
       <div class="row"><label for="fnow">Funding praegu <span class="unit">oi_weighted, %</span></label><input type="number" id="fnow" value="0.042" step="0.001"></div>
       <textarea id="fhist" rows="2" aria-label="Fundingu ajalugu">0.01 0.008 0.012 0.005 0.015 0.010 0.009 0.011 0.013 0.007 0.010 0.012</textarea>
       <p class="hist-label">Fundingu ajalugu %-des — mediaan ja MAD arvutatakse siit</p>
-      <div class="row"><label for="bnow">Basis praegu <span class="unit">annualiseeritud, %</span></label><input type="number" id="bnow" value="11.8" step="0.1"></div>
-      <textarea id="bhist" rows="2" aria-label="Basise ajalugu">5.0 6.0 4.5 5.5 7.0 5.0 4.8 6.2 5.8 5.0</textarea>
-      <p class="hist-label">Basise ajalugu %-des</p>
+      <div class="row"><label for="bnow">Basis praegu <span class="unit">toores (perp vs spot), %</span></label><input type="number" id="bnow" value="0.42" step="0.01"></div>
+      <textarea id="bhist" rows="2" aria-label="Basise ajalugu">0.18 0.22 0.16 0.20 0.26 0.18 0.17 0.23 0.21 0.18</textarea>
+      <p class="hist-label">Basise ajalugu toorestes %-des — sama ühik mis üleval, mitte ×365</p>
       <div class="row"><label for="ls">Long/short ratio <span class="unit">global</span></label><input type="number" id="ls" value="2.35" step="0.05"></div>
       <div class="row"><label for="share">Selle börsi OI osakaal <span class="unit">by_exchange, %</span></label><input type="number" id="share" value="53" step="1"></div>
     </fieldset>
@@ -361,7 +361,7 @@
                 : `ajalugu on liiga lühike (${fh.length} vaatlust, vaja ≥ 8) — komponent maas`,
        src:"funding_history action=oi_weighted"},
       {n:"Basis", w:30, s:squash(bz.z), on:bz.ok,
-       d: bz.ok ? `annualiseeritud ${num('bnow').toFixed(1)}%, z = ${bz.z>=0?"+":""}${bz.z.toFixed(1)}`
+       d: bz.ok ? `toores ${num('bnow').toFixed(2)}%, z = ${bz.z>=0?"+":""}${bz.z.toFixed(1)}`
                 : `ajalugu on liiga lühike (${bh.length} vaatlust, vaja ≥ 8) — komponent maas`,
        src:"kvartalifutuur vs spot"},
       // vale venue ei ole nõrk andmepunkt, ta ei ole andmepunkt — muidu loeks

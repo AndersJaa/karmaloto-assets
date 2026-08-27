@@ -426,6 +426,36 @@ class Lugemine:
                 * self.varavad.kaetud_oi_osakaal
                 * (self.voo_kate + self.surve_kate) / 2)
 
+    def vastuolu(self, komponendid: list[Komponent], telje_nimi: str) -> str | None:
+        """Kas telje väärtus on väike sellepärast, et komponendid tühistavad teineteist?
+
+        Telg −2 võib tähendada kahte täiesti eri asja: kõik komponendid on
+        vaiksed, või kaks tugevat komponenti näitavad vastassuunda ja summa
+        juhtub nulli lähedale kukkuma. Esimene on „ei ole survet", teine on
+        „andmed ei ole ühel meelel". Numbrina on nad identsed, tähenduselt
+        vastandid — ja vaikimisi esitatakse teine esimesena.
+        """
+        kehtivad = [k for k in komponendid if k.kehtiv]
+        kaalud = sum(k.kaal for k in kehtivad)
+        if not kaalud:
+            return None
+        panused = [(k.nimi, 100.0 * k.skoor * k.kaal / kaalud) for k in kehtivad]
+        plussid = [p for p in panused if p[1] > 20]
+        miinused = [p for p in panused if p[1] < -20]
+        if not (plussid and miinused):
+            return None
+        summa = sum(p[1] for p in panused)
+        if abs(summa) > 20:
+            return None  # üks pool võitis selgelt, see ei ole tühistus
+        nimed = ", ".join(f"{n} {v:+.0f}" for n, v in sorted(panused, key=lambda x: -abs(x[1])))
+        return (f'{telje_nimi} on {summa:+.0f} sellepärast, et komponendid tühistavad '
+                f'teineteist ({nimed}) — see EI ole „neutraalne", vaid „andmed ei ole '
+                f'ühel meelel". Vaata komponente eraldi.')
+
+    def vastuolud(self) -> list[str]:
+        return [x for x in (self.vastuolu(self.v_komponendid, "Voog"),
+                            self.vastuolu(self.s_komponendid, "Surve")) if x]
+
     def kvadrant(self) -> tuple[str, str]:
         # Kaetuse põrand. Kaal jaotub puuduvate komponentide pealt ümber, mis on
         # õige — aga kui alles on vähem kui pool, siis ei mõõda telg enam seda,
@@ -473,6 +503,8 @@ class Lugemine:
         ]
         for h in self.varavad.hoiatused():
             r.append(f"  ! {h}")
+        for x in self.vastuolud():
+            r.append(f"  !! {x}")
         r += ["", "  V-telje panus:"]
         vk = sum(k.kaal for k in self.v_komponendid if k.kehtiv)
         for k in self.v_komponendid:
@@ -652,6 +684,31 @@ def _test() -> None:
     assert piisav.kvadrant()[0] != "LUGEMIST EI OLE", "65% kaetust peab lugemise andma"
     ok += 1
 
+    # tühistuv telg ei ole neutraalne telg
+    tyhistav = arvuta("X", [Komponent("a", 0.9, 100, "", "")],
+                      [Komponent("Funding", -0.66, 45, "", ""),
+                       Komponent("Basis", 0.93, 30, "", ""),
+                       Komponent("L/S", 0.0, 25, "", "", kehtiv=False)],
+                      Varavad(), 0.5, invalideerimine="t")
+    v = tyhistav.vastuolud()
+    assert v, f"funding −30 ja basis +28 peavad andma vastuolu, sai S={tyhistav.surve:.1f}"
+    assert "ei ole ühel meelel" in v[0] and "Funding" in v[0] and "Basis" in v[0]
+
+    # päriselt vaikne telg EI tohi vastuolu lippu saada
+    vaikne = arvuta("X", [Komponent("a", 0.9, 100, "", "")],
+                    [Komponent("Funding", 0.02, 45, "", ""),
+                     Komponent("Basis", -0.03, 30, "", "")],
+                    Varavad(), 0.5, invalideerimine="t")
+    assert not vaikne.vastuolud(), "väikesed komponendid ei ole tühistus"
+
+    # selge võitja EI ole tühistus
+    selge = arvuta("X", [Komponent("a", 0.9, 100, "", "")],
+                   [Komponent("Funding", 0.9, 45, "", ""),
+                    Komponent("Basis", -0.4, 30, "", "")],
+                   Varavad(), 0.5, invalideerimine="t")
+    assert not selge.vastuolud(), "kui üks pool võidab selgelt, ei ole see tühistus"
+    ok += 1
+
     # BTC enda peal ei ole korrelatsioon iseendaga näitaja
     v_btc = [Komponent("a", 0.9, 100, "", "")]
     s_btc = [Komponent("b", 0.5, 100, "", "")]
@@ -719,7 +776,7 @@ def _test() -> None:
     assert kokku.reziim[0] == "kokku surutud" and lai.reziim[0] == "laienenud"
     ok += 1
 
-    print(f"{ok}/17 testiplokki OK")
+    print(f"{ok}/18 testiplokki OK")
 
 
 if __name__ == "__main__":
