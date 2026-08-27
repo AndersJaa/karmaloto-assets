@@ -147,6 +147,40 @@
   footer{margin-top:36px; padding-top:20px; border-top:1px solid var(--rule); color:var(--muted); font-size:.85rem}
   footer p{max-width:70ch; margin:0 0 8px}
   footer strong{color:var(--ink)}
+
+  /* ---------- positsioon: KONTEKST, mitte VSI sisend ---------- */
+  .posit{margin-top:24px}
+  .sechead{font-family:"Newsreader",Georgia,serif; font-size:1.5rem; font-weight:600; margin:0 0 6px; letter-spacing:-.01em}
+  .secsub{margin:0 0 16px; color:var(--muted); max-width:68ch; font-size:.88rem}
+  .secsub strong{color:var(--ink); font-weight:600}
+  .stats{display:grid; gap:12px; grid-template-columns:repeat(4,minmax(0,1fr)); margin-bottom:20px}
+  @media (max-width:820px){ .stats{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  .stat{background:var(--card); border:1px solid var(--rule); padding:14px 15px}
+  .stat .k{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:0 0 6px}
+  .stat .v{font-family:"IBM Plex Mono",monospace; font-size:1.3rem; font-variant-numeric:tabular-nums; line-height:1.1; margin:0; overflow-wrap:anywhere}
+  .stat .v.pos{color:var(--pos)} .stat .v.neg{color:var(--neg)} .stat .v.off{color:var(--muted)}
+  .stat .s b{font-weight:600} .stat .s b.pos{color:var(--pos)} .stat .s b.neg{color:var(--neg)}
+  .stat .s{font-size:.78rem; color:var(--muted); margin:5px 0 0; overflow-wrap:anywhere}
+
+  .ladder{display:grid; gap:5px}
+  .lrow{display:grid; grid-template-columns:70px minmax(0,1fr) 78px; gap:9px; align-items:center}
+  .lprice{font-family:"IBM Plex Mono",monospace; font-size:.78rem; font-variant-numeric:tabular-nums; text-align:right; color:var(--ink-2)}
+  .ltrack{position:relative; height:17px; background:var(--dead)}
+  .lfill{position:absolute; left:0; top:2px; bottom:2px}
+  .lfill.buy{background:var(--pos-wash); border-left:3px solid var(--pos)}
+  .lfill.sell{background:var(--neg-wash); border-left:3px solid var(--neg)}
+  .lusd{font-family:"IBM Plex Mono",monospace; font-size:.76rem; text-align:right; font-variant-numeric:tabular-nums; color:var(--ink)}
+  .lmark{display:grid; grid-template-columns:70px minmax(0,1fr) 78px; gap:9px; align-items:center; margin:2px 0}
+  .lmark .rule{border-top:1px dashed var(--muted); opacity:.75}
+  .lmark .tag{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); white-space:nowrap}
+  .lmark .tag.r{text-align:right}
+  .warn{color:var(--neg); font-size:.82rem; margin:10px 0 0}
+  /* kahe veeru tabel ei vaja jagatud min-width:520px reeglit — see ei mahu
+     telefoni ja lykkab kogu ruudustiku ekraanist valja */
+  #wtbl{min-width:0}
+  #wtbl th{width:52%; white-space:normal}
+  #wtbl td.num{width:48%}
+
   @media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
   .bar-fill,#tip{transition:all .12s ease-out}
 </style>
@@ -268,6 +302,34 @@
         </details>
       </figure>
     </div>
+
+
+    <section class="posit" id="posit" hidden>
+      <h2 class="sechead">Positsioon ja likviidsus</h2>
+      <p class="secsub"><strong>Ükski nendest arvudest ei lähe kummalegi teljele.</strong> Vaalade skann ja
+      likvideerimiskaart on eri vanusega kui ülemine lugemine — seepärast kannab kumbki oma kellaaega, mitte
+      faili oma. Suund on kirjutatud turu, mitte lugeja positsiooni kaudu: siin ei ole „sinu shorti riski",
+      sest leht ei tea, mis positsioon sul on, ja ei tohiks teada.</p>
+      <div class="stats" id="pstats"></div>
+      <div class="charts">
+        <figure>
+          <figcaption>Likvideerimisredel</figcaption>
+          <p class="figsub" id="lsub"></p>
+          <div class="ladder" id="ladder"></div>
+          <div class="legend">
+            <span><i class="sw pos"></i> hinnast ÜLAL — shortide sundsulgemine ostab</span>
+            <span><i class="sw neg"></i> hinnast ALL — longide sundsulgemine müüb</span>
+          </div>
+          <p class="warn" id="lwarn" hidden></p>
+        </figure>
+        <figure>
+          <figcaption>Vaalade positsioonid</figcaption>
+          <p class="figsub" id="wsub"></p>
+          <div class="tblwrap"><table id="wtbl"><tbody></tbody></table></div>
+          <p class="warn" id="wwarn" hidden></p>
+        </figure>
+      </div>
+    </section>
 
     <footer>
       <p>Iga arv kannab oma allikat — tabelivaates on iga rea juures kutse, mis ta andis.
@@ -564,6 +626,139 @@
     $('vmeta').innerHTML = chips.join("");
   }
 
+
+  // ---------- Positsioon: kontekstiplokk ----------
+  // Need arvud EI lähe VSI-sse ja see on meelega. Vaalade skann ja
+  // likvideerimiskaart on eri vanusega kui voog; vanema numbri liitmine
+  // varskele annaks lugemise, mis naeb terve valja, aga mootis kahte
+  // erinevat hetke. Nad seisavad korval, oma kellaajaga.
+  function raha(x){
+    const a = Math.abs(x);
+    if(a >= 1e9) return (x/1e9).toFixed(2) + " mld $";
+    if(a >= 1e6) return (x/1e6).toFixed(1) + " M$";
+    if(a >= 1e3) return (x/1e3).toFixed(0) + " k$";
+    return x.toFixed(0) + " $";
+  }
+  const olemas = v => v !== undefined && v !== null && v !== "";
+  const mark2 = x => (x >= 0 ? "+" : "") + x.toFixed(2);
+  const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+  function kaart(k, v, klass, s){
+    return `<div class="stat"><p class="k">${esc(k)}</p>`
+         + `<p class="v ${klass}">${esc(v)}</p>`
+         + `<p class="s">${s}</p></div>`;
+  }
+
+  function positsioon(ctx, hind, coin){
+    const sek = $('posit');
+    if(!ctx || typeof ctx !== "object" || !Object.keys(ctx).length) return;
+    sek.hidden = false;
+
+    const vaal = ctx.vaalad || {}, kaart_ = ctx.likvideerimiskaart || {}, btc = ctx.btc || {};
+    const mark = olemas(hind && hind.mark) ? +hind.mark : null;
+
+    // --- neli kaarti ---
+    const c = [];
+    if(mark !== null){
+      const d24 = olemas(hind.muutus_24h_pct) ? +hind.muutus_24h_pct : null;
+      // Hind ise ei ole positiivne ega negatiivne. Varvi kannab muutus, mitte
+      // tase — muidu varvib leht arvu, mille marki ta ei tea.
+      c.push(kaart(esc(coin) + " mark", mark.toFixed(mark < 10 ? 4 : 2), "",
+                   d24 === null ? "24h muutus puudub"
+                     : `24h <b class="${d24 >= 0 ? "pos" : "neg"}">${mark2(d24)}%</b> &middot; Hyperliquid`));
+    }
+    if(olemas(vaal.neto_usd)){
+      const n = +vaal.neto_usd;
+      c.push(kaart("Vaalade neto", raha(n), n >= 0 ? "pos" : "neg",
+                   `${olemas(vaal.long) ? vaal.long : "?"} long / ${olemas(vaal.short) ? vaal.short : "?"} short`
+                   + (olemas(vaal.positsioone) ? ` &middot; ${vaal.positsioone} positsiooni` : "")));
+    }
+    if(olemas(ctx.hl_funding_keskmine_pct)){
+      const f = +ctx.hl_funding_keskmine_pct;
+      const p = olemas(ctx.hl_funding_keskmine_punkte) ? ctx.hl_funding_keskmine_punkte : "?";
+        c.push(kaart("HL funding, %/h", (f >= 0 ? "+" : "") + f.toFixed(4), f >= 0 ? "pos" : "neg",
+                   `${p} punkti keskmine${olemas(ctx.hl_funding_1h_pct)
+                     ? ` &middot; viimane tikk ${(+ctx.hl_funding_1h_pct >= 0 ? "+" : "")}${(+ctx.hl_funding_1h_pct).toFixed(4)}` : ""}`
+                   + ` &middot; <strong>ei korrutata 24-ga</strong>`));
+    } else {
+      c.push(kaart("HL funding, %/h", "—", "off",
+                   "münt ei ole Hyperliquidil või välja ei tulnud — teise börsi määra siia ei kirjutata"));
+    }
+    if(olemas(btc.hind)){
+      const d = olemas(btc.muutus_24h_pct) ? +btc.muutus_24h_pct : null;
+      c.push(kaart("BTC", "$" + Math.round(+btc.hind).toLocaleString("et-EE"), "",
+                   d === null ? "24h muutus puudub"
+                     : `24h <b class="${d >= 0 ? "pos" : "neg"}">${mark2(d)}%</b>`));
+    }
+    $('pstats').innerHTML = c.join("");
+
+    // --- likvideerimisredel ---
+    const tasemed = Array.isArray(kaart_.tasemed) ? kaart_.tasemed.slice() : [];
+    if(tasemed.length){
+      tasemed.sort((a,b) => (+b.hind) - (+a.hind));
+      const maxU = Math.max(...tasemed.map(t => Math.abs(+t.usd || 0))) || 1;
+      const rida = t => {
+        const h = +t.hind, u = +t.usd || 0;
+        const ost = mark !== null ? h > mark : true;
+        const w = Math.max(2, 100 * Math.abs(u) / maxU);
+        const kt = olemas(t.kontosid) ? `${t.kontosid} kontot &middot; ` : "";
+        return `<div class="lrow" title="${kt}${raha(u)} ${ost ? "shortide" : "longide"} sundsulgemist hinnal ${h}">`
+             + `<span class="lprice">${h.toFixed(h < 10 ? 3 : 2)}</span>`
+             + `<span class="ltrack"><span class="lfill ${ost ? "buy" : "sell"}" style="width:${w}%"></span></span>`
+             + `<span class="lusd">${raha(u)}</span></div>`;
+      };
+      const ules = tasemed.filter(t => mark === null || +t.hind > mark);
+      const alla  = tasemed.filter(t => mark !== null && +t.hind <= mark);
+      let html = ules.map(rida).join("");
+      if(mark !== null){
+        html += `<div class="lmark"><span class="tag r">${mark.toFixed(mark < 10 ? 3 : 2)}</span>`
+              + `<span class="rule"></span><span class="tag">hind praegu</span></div>`;
+        html += alla.map(rida).join("");
+      }
+      $('ladder').innerHTML = html;
+
+      const osad = [];
+      const sumU = ules.reduce((a,t) => a + (+t.usd || 0), 0);
+      const sumA = alla.reduce((a,t) => a + (+t.usd || 0), 0);
+      if(mark !== null) osad.push(`ülal ${raha(sumU)}, all ${raha(sumA)}`);
+      if(olemas(kaart_.baashind)) osad.push(`kaart arvutatud hinnal ${(+kaart_.baashind).toFixed(2)}`);
+      $('lsub').innerHTML = "Riba pikkus on klastri suurus dollarites. " + osad.join(" &middot; ") + ".";
+
+      if(olemas(kaart_.nihe_pct) && Math.abs(+kaart_.nihe_pct) > 2){
+        $('lwarn').hidden = false;
+        $('lwarn').textContent =
+          `Hind on baashinnast ${mark2(+kaart_.nihe_pct)}% eemal — kaart on joonistatud teise hinna ümber `
+          + `kui praegu kehtib. Tasemed on suunas õiged, kaugused mitte.`;
+      }
+    } else {
+      $('lsub').textContent = "Likvideerimiskaarti ei tulnud — rida siin ei joonistata. "
+        + "Tühi redel oleks väide, et klastreid ei ole; õige väide on, et neid ei mõõdetud.";
+    }
+
+    // --- vaalade tabel ---
+    const r = [];
+    const lisa = (n, v) => r.push(`<tr><th>${esc(n)}</th><td class="num">${esc(v)}</td></tr>`);
+    if(olemas(vaal.positsioone)) lisa("Positsioone skannis", vaal.positsioone);
+    if(olemas(vaal.long))        lisa("Neist long", vaal.long);
+    if(olemas(vaal.short))       lisa("Neist short", vaal.short);
+    if(olemas(vaal.neto_usd))    lisa("Neto notionaal", raha(+vaal.neto_usd));
+    if(olemas(vaal.skanni_aeg))  lisa("Skanni aeg", vaal.skanni_aeg);
+    $('wtbl').querySelector("tbody").innerHTML = r.join("");
+    $('wsub').innerHTML = r.length
+      ? "Üks definitsioon: Hyperliquidi leaderboardi skann. Skann ei käi iga tunni tagant — kellaaeg on real."
+      : "Vaalade skanni ei tulnud. Arv ilma skanni ajata on täpselt see, mille vastu kogu leping on.";
+
+    // Summa peab klappima. Kui ei klapi, on kaks arvu eri hetkest või eri
+    // definitsioonist — ja just sellest vaikimisest see projekt alguse sai.
+    if(olemas(vaal.long) && olemas(vaal.short) && olemas(vaal.positsioone)
+       && (+vaal.long + +vaal.short) !== +vaal.positsioone){
+      $('wwarn').hidden = false;
+      $('wwarn').textContent =
+        `${vaal.long} long + ${vaal.short} short = ${+vaal.long + +vaal.short}, aga positsioone on `
+        + `${vaal.positsioone}. Kaks arvu ei ole samast skannist — ära loe kumbagi enne, kui see klapib.`;
+    }
+  }
+
   // Genereeritud lugemine annab kaasa window.VSI_PRESET — väljad täidetakse ette,
   // aga jäävad muudetavaks, et telefonis saaks kohe "aga mis siis kui" läbi mängida.
   const preset = window.VSI_PRESET;
@@ -573,6 +768,7 @@
       if(el) el.value = v;
     });
     if(preset.silt) $('eyebrow').textContent = preset.silt;
+    positsioon(preset.kontekst, preset.hind || {}, preset.coin || "");
   }
 
   $('inputs').addEventListener('input', update);

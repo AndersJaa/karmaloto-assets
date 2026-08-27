@@ -222,6 +222,13 @@ def preset(d: dict) -> dict:
             "ema": "1" if d["hind_ule_ema200"] else "0",
             "inval": d["invalideerimine"],
         },
+        # Kontekstiplokk: vaalad, likvideerimiskaart, BTC, Hyperliquidi funding.
+        # Need EI ole VSI sisendid ja ei tohi kunagi „vaartused" alla sattuda —
+        # nad on teisest hetkest ja teise kattega kui telgede numbrid. Leht
+        # joonistab neid eraldi sektsioonis, oma kellaajaga.
+        "coin": d["coin"],
+        "hind": d.get("hind", {}),
+        "kontekst": d.get("kontekst", {}),
     }
 
 
@@ -248,8 +255,10 @@ def main() -> None:
 
     mall = Path(__file__).parent.parent / "assets" / "vsi-kaart.html"
     leht = mall.read_text(encoding="utf-8")
+    # < asendatakse, et andmes olev </script> lehte pooleks ei loigaks
     süst = ("<script>window.VSI_PRESET = "
-            + json.dumps(preset(d), ensure_ascii=False) + ";</script>\n")
+            + json.dumps(preset(d), ensure_ascii=False).replace("<", "\\u003c")
+            + ";</script>\n")
     # preset peab jõudma lehele enne peaskripti, muidu update() jookseb tühjadega
     leht = leht.replace("<style>", süst + "<style>", 1)
     Path(args.valja).write_text(leht, encoding="utf-8")
