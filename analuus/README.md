@@ -38,11 +38,24 @@ python3 vsi/skanner.py --test    # 9 testiplokki
 
 | Tükk | Kus | Millal |
 |---|---|---|
-| `vsi_fetch.py` | Andersi Mac, `~/Documents/Claude/Projects/Trade/` | iga tund, launchd |
-| `market_data.py` | sama koht | iga tund, launchd |
+| `turg_fetch.py` | Andersi Mac, `~/Documents/Claude/Projects/Trade/` | iga tund :05 — **ainus kirjutaja** |
+| `market_data.py` | sama koht | iga tund :00 — andmeallikas, ei kirjuta enam väljundeid |
+| `vsi_fetch.py` | sama koht | **pensionil** — `turg_fetch` impordib sealt CoinGlassi kihi, ise ei kirjuta |
 | Positsiooni päevaraport | Claude Routine, pilves | iga päev 13:00 |
 | `vsi` skill | Andersi konto | iga kord, kui küsib |
 
 CoinGlass on **lokaalne** MCP-server Andersi Macis. Pilv teda ei näe — sellepärast
-käib ahel läbi Google Drive'i (`TradeData/vsi_input.json`). Kataloogis hostitud
+käib ahel läbi Google Drive'i (`TradeData/turg.json`). Kataloogis hostitud
 CoinGlassi ühendust ei ole olemas, kontrollitud.
+
+Andmeleping: [`ANDMELEPING.md`](ANDMELEPING.md). Üks kirjutaja, üks fail, üks
+ajatempel. `turg.json`, `raport.csv` ja `andmed.txt` tulevad ühest ja samast
+tõmbest — kontrollitud tootmises, kõik kolm sama sekundiga.
+
+**Teadaolevad piirangud, mis on kontrollitud ja mida ei pea uuesti uurima:**
+
+- Hyperliquidi `global-long-short-account-ratio` vastab `Upgrade plan`.
+  Endpoint ise on plaani taga — see ei ole intervalli küsimus. Kutse on koodis
+  alles: kui plaan muutub, hakkab ta tööle ilma muudatuseta.
+- Basis HYPE-l **tuleb Bybitilt**, mitte Binance'ilt ega OKX-ilt. Ärge järeldage
+  kahe börsi pealt, et mündil kvartalifutuuri ei ole.
