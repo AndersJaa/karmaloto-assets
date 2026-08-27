@@ -60,10 +60,23 @@ turg.json
 | `ajatempel` | ISO 8601, UTC | Kogu faili kirjutamise hetk. **Üks kõigile.** |
 | `coin` | tekst | Sümbol, nt `HYPE` |
 | `aken` | tekst | `h4×6` — kõik voo väljad sellest aknast |
-| `versioon` | arv | Selle lepingu versioon; muutub, kui väli lisandub või tähendus muutub |
+| `versioon` | arv | Algab **1**-st. Tõuseb, kui väli lisandub, kaob või **tähendus muutub**. Ühiku või akna muutus on tähenduse muutus |
 
 Kui mõni allikas on vanem kui `ajatempel`, on selle välja kõrval oma
 `_vanus_h`. Ilma selleta eeldatakse, et väli on failiga sama vana.
+
+**`_vanus_h` mõõdetakse küünla LÕPUST, mitte avamisest.** Avamisest mõõtes
+näitaks iga värske h4 lugemine end kuni neli tundi vanana ja vanusevärav
+lööks põhjuseta sisse.
+
+### `_allikad`
+
+Allakriipsuga plokk, mis ei ole andmeväli vaid **andmete pass**: iga välja kohta
+endpoint ja börsikomplekt, millelt ta tuli. Lepingu alapealkiri lubab, et iga
+väli kannab allikat — see plokk on koht, kus lubadus täidetakse.
+
+Ilma allikata välja faili ei kirjutata. Arv, mille päritolu ei ole kirjas, on
+täpselt see, mille vastu kogu leping on.
 
 ### hind
 
@@ -123,6 +136,11 @@ Need on lugemiseks ja kuvamiseks, mitte indeksi sisendiks.
 | `hl_funding_1h_pct` | **%/h.** Hyperliquidi viimane tikk. Allikas `market_snapshot.funding` (fraktsioon) × 100. Oma nime all, mitte `funding_pct` asemel |
 | `hl_funding_keskmine_pct` | **%/h.** Sama määr, `oi_trend.funding_avg` × 100. **Kuvamisel eelistatakse seda üksikule tikile** |
 | `hl_funding_keskmine_punkte` | Mitu punkti keskmises (praegu 48) — arv, mis kirjeldab iseennast |
+
+**Kui münt ei ole Hyperliquidil, jäävad kõik kolm välja välja.** Binance'i 8h
+määra `hl_funding_*` nime alla kirjutada tähendaks ümbersildistamist — täpselt
+seda, millest see leping välja tuli. Nimi ütleb börsi; teise börsi arv sinna ei
+mahu, ükskõik kui mugav see oleks.
 
 Kolm reeglit nende juurde:
 
