@@ -120,8 +120,20 @@ Need on lugemiseks ja kuvamiseks, mitte indeksi sisendiks.
 | `likvideerimiskaart.baashind` | Mis hinnaga kaart arvutati |
 | `likvideerimiskaart.nihe_pct` | Praegune hind vs baashind. Üle 2% → märgi |
 | `btc.hind`, `btc.muutus_24h_pct` | |
-| `hl_funding_1h_pct` | Hyperliquidi **tunnine** määr — mida Anders oma venue'il päriselt maksab. Oma nime all, mitte `funding_pct` asemel |
-| `hl_funding_keskmine_pct` | 48 punkti keskmine (`oi_trend.funding_avg`). **Kuvamisel eelistatakse seda üksikule tikile** |
+| `hl_funding_1h_pct` | **%/h.** Hyperliquidi viimane tikk. Allikas `market_snapshot.funding` (fraktsioon) × 100. Oma nime all, mitte `funding_pct` asemel |
+| `hl_funding_keskmine_pct` | **%/h.** Sama määr, `oi_trend.funding_avg` × 100. **Kuvamisel eelistatakse seda üksikule tikile** |
+| `hl_funding_keskmine_punkte` | Mitu punkti keskmises (praegu 48) — arv, mis kirjeldab iseennast |
+
+Kolm reeglit nende juurde:
+
+1. **Ühik on %/h ja jääb %/h-ks.** `× 24` ei tehta kuskil. Kui päevamäära on
+   päriselt vaja, arvutatakse see **keskmisest**, mitte tikist, ja nimetatakse
+   „48 punkti keskmine päevamäärana", mitte lihtsalt „%/päevas".
+2. **Tikki ei kuvata üksi.** Kui teda näidatakse, siis keskmise kõrval, sildiga
+   „viimane tikk" — muidu loeb inimene müra trendina.
+3. **Need EI lähe S-teljele.** S-telje funding on `surve.funding_pct`
+   (%/8h, oi_weighted, mitu börsi). Need kaks on „mida sa maksad", mitte
+   „kus rahvahulk on". Kaks eri küsimust, kaks eri välja.
 
 **Vaalade arv tuleb ainult siit.** Kui leht näitab „6 positsiooni" ja raport
 „7/7", siis üks neist ei lugenud failist.
