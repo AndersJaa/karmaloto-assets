@@ -108,13 +108,21 @@ def lepingust(d: dict) -> dict:
             if t.tzinfo is None:
                 t = t.replace(tzinfo=timezone.utc)
             vanus = (datetime.now(timezone.utc) - t).total_seconds() / 3600
-            if vanus < -0.5:
-                raise SystemExit(
-                    f"meta.ajatempel on tulevikus ({stamp}) — vanus tuleks {vanus:.1f}h.\n"
-                    "Tõenäoliselt on kirjutatud kohalik aeg UTC sildiga. Vanusevärav ei "
-                    "saa niimoodi tööle hakata, seega lugemist ei anta."
+            if vanus < -0.05:
+                # Ajatempel on tulevikus — kella silt on vale, tõenäoliselt on
+                # kirjutatud kohalik aeg UTC-na. Andmed ise ei ole sellest katki,
+                # aga VANUST ei saa arvutada. Lugemist ei blokeerita: label-viga
+                # ei ole andmeviga. Küll aga öeldakse see valjult välja, sest
+                # vaikselt nulliga edasi minek tähendaks, et vanusevärav on
+                # välja lülitatud ja keegi ei tea seda.
+                lame["_ajatempli_viga"] = (
+                    f"meta.ajatempel on {abs(vanus):.1f}h TULEVIKUS ({stamp}). "
+                    "Tõenäoliselt kirjutatud kohalik aeg UTC sildiga. "
+                    "VANUS ON TEADMATA — vanusevärav ei tööta, kuni allikas on parandatud."
                 )
-            lame["andmete_vanus_h"] = round(max(vanus, 0.0), 2)
+                lame["andmete_vanus_h"] = 0.0
+            else:
+                lame["andmete_vanus_h"] = round(vanus, 2)
         except ValueError:
             raise SystemExit(f"meta.ajatempel ei ole loetav kuupäev: {stamp}")
 
@@ -232,7 +240,11 @@ def main() -> None:
         d["invalideerimine"] = args.invalideerimine
     kontrolli(d)
     lugemine = ehita(d)
+    if d.get("_ajatempli_viga"):
+        print("\n  !! " + d["_ajatempli_viga"] + "\n")
     print(lugemine.render())
+    if d.get("_ajatempli_viga"):
+        print("\n  !! " + d["_ajatempli_viga"])
 
     mall = Path(__file__).parent.parent / "assets" / "vsi-kaart.html"
     leht = mall.read_text(encoding="utf-8")
