@@ -30,7 +30,7 @@ Kõik avaldatud lehed on ka galeriis: `claude.ai/code/artifacts`
 ## Testid
 
 ```bash
-python3 vsi/vsi.py --test        # 17 testiplokki
+python3 vsi/vsi.py --test        # 18 testiplokki
 python3 vsi/skanner.py --test    # 9 testiplokki
 ```
 

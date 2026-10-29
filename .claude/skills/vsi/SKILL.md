@@ -170,4 +170,4 @@ Neid ei pea käsitsi jälgima — skript teeb ja kirjutab välja:
 - `scripts/run_vsi.py` — JSON sisse, lugemine ja leht välja
 - `assets/vsi-kaart.html` — lehe mall
 
-Mooduli enda testid: `python3 scripts/vsi.py --test` (16 testiplokki).
+Mooduli enda testid: `python3 scripts/vsi.py --test` (18 testiplokki).

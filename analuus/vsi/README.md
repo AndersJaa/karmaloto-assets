@@ -5,7 +5,7 @@ Liitindikaator, mis koondab **ainult mehaaniliselt mõõdetavad** näitajad
 
 ```
 python3 vsi.py --demo     # näidislugemine väljamõeldud arvudega
-python3 vsi.py --test     # 14 testiplokki
+python3 vsi.py --test     # 18 testiplokki
 ```
 
 ## Miks Elliott siin ei ole
